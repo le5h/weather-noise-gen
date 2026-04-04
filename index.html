@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Snowflakes - Optimized</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        /* Responsive snowflake count based on viewport size */
+        @media (min-width: 768px) {
+            #snowflakes-canvas {
+                --snowflake-count: 200;
+            }
+        }
+        @media (min-width: 1024px) {
+            #snowflakes-canvas {
+                --snowflake-count: 300;
+            }
+        }
+        @media (min-width: 1920px) {
+            #snowflakes-canvas {
+                --snowflake-count: 500;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="snowflakes-canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('snowflakes-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for non-transparent backgrounds
+
+        // Set canvas to full viewport size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Handle high-DPI displays
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvas.width = canvas.width * dpr;
+            canvas.height = canvas.height * dpr;
+            ctx.scale(dpr, dpr);
+        }
+
+        // Get snowflake count from CSS variable or localStorage fallback
+        function getSnowflakeCount() {
+            const cssVar = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--snowflake-count'));
+            return cssVar ? cssVar : 100;
+        }
+
+        // Snowflake class with lifecycle management
+        class Snowflake {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 2 + 1; // size between 1-3
+                this.speedX = (Math.random() - 0.5) * 0.5; // slight horizontal drift
+                this.speedY = 1 + Math.random() * 2; // gravity
+                this.color = `hsl(${Math.floor(360*Math.random())}, ${Math.floor(80+Math.random()*40)}%, ${Math.floor(70+Math.random()*20)}%)`;
+                this.life = 1.0; // Life factor for fade effect
+            }
+
+            draw() {
+                ctx.globalAlpha = this.life;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size/2, 0, Math.PI*2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.globalAlpha = 1.0; // Reset alpha for other elements
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                
+                // Bounce off bottom edge with slight speed variation
+                if (this.y > canvas.height) {
+                    this.y = -Math.random() * 100;
+                    this.life -= 0.005; // Gradually fade out old snowflakes
+                    this.speedY = Math.random() * 2 + 1;
+                    
+                    // Respawn if life is too low (prevents accumulation)
+                    if (this.life <= 0) {
+                        return false; // Signal to remove this snowflake
+                    }
+                }
+
+                // Keep within bounds
+                this.x = Math.max(0, Math.min(canvas.width, this.x));
+                
+                return true; // Snowflake is still active
+            }
+        }
+
+        // Create initial snowflakes
+        const snowflakes = [];
+        function initSnowflakes(count) {
+            for (let i=0; i<count; i++) {
+                const x = Math.random() * canvas.width;
+                const y = -Math.random() * 100;
+                snowflakes.push(new Snowflake(x, y));
+            }
+        }
+
+        // Animation loop with optimized clearing
+        function animate() {
+            // Use composite operation for better performance than clearRect
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // Update and draw snowflakes in a single pass
+            let activeCount = 0;
+            for (const flake of snowflakes) {
+                const shouldKeep = flake.update();
+                if (shouldKeep) {
+                    flake.draw();
+                    activeCount++;
+                } else {
+                    // Remove dead snowflake to prevent memory buildup
+                    const index = snowflakes.indexOf(flake);
+                    if (index > -1) {
+                        snowflakes.splice(index, 1);
+                    }
+                }
+            }
+
+            // Add new snowflakes if we've lost too many
+            while (snowflakes.length < getSnowflakeCount() && Math.random() > 0.95) {
+                const x = Math.random() * canvas.width;
+                const y = -Math.random() * 100;
+                snowflakes.push(new Snowflake(x, y));
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Initialize and start animation
+        window.onload = () => {
+            resizeCanvas();
+            initSnowflakes(getSnowflakeCount());
+            animate();
+            
+            console.log(`Initialized ${snowflakes.length} snowflakes`);
+        };
+
+        // Handle window resizing
+        window.addEventListener('resize', resizeCanvas);
+        
+        // Performance monitoring
+        let lastFrameTime = performance.now();
+        function monitorPerformance() {
+            const now = performance.now();
+            const delta = now - lastFrameTime;
+            
+            if (delta >= 1000) {
+                const fps = Math.round(1000 / delta);
+                console.log(`FPS: ${fps}, Active snowflakes: ${snowflakes.length}`);
+                lastFrameTime = now;
+            }
+        }
+
+        // Start performance monitoring
+        setInterval(monitorPerformance, 1000);
+    </script>
+</body>
+</html>
