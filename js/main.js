@@ -76,6 +76,14 @@ class WeatherApp {
     startExperience() {
         this.isStarted = true;
         
+        // Select random weather mode
+        const weatherTypes = Object.keys(this.weatherConfig);
+        const randomWeather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+        this.currentWeather = randomWeather;
+        
+        // Update background immediately before fade starts
+        this.weatherApp.dataset.weather = this.weatherConfig[this.currentWeather].background;
+        
         // Hide start screen with fade effect
         this.startScreen.style.opacity = '0';
         this.startScreen.style.transition = 'opacity 0.5s ease-out';
@@ -88,14 +96,11 @@ class WeatherApp {
             // Initialize audio and start weather
             this.audioManager.init();
             
-            // Set weather and ensure UI is properly updated
+            // Set random weather and ensure UI is properly updated
             this.setWeather(this.currentWeather);
             
             // Force UI update to show active state
             this.updateUI(this.currentWeather);
-            
-            // Update background
-            this.weatherApp.dataset.weather = this.weatherConfig[this.currentWeather].background;
             
             this.startAnimation();
         }, 500);

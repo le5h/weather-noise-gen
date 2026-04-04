@@ -74,6 +74,7 @@ export class AudioManager {
                 break;
             case 'windy':
                 this.startWindSound();
+                this.startTreeNoiseSound();
                 break;
             case 'rain':
                 this.startRainSound();
@@ -301,6 +302,34 @@ export class AudioManager {
             } catch (e) {}
             this.sunGain = null;
         }
+        
+        // Cleanup tree noise sources
+        if (this.treeNoiseSources) {
+            this.treeNoiseSources.forEach(({ noiseSource, filter, layerGain, burstLfo }) => {
+                try {
+                    noiseSource.stop();
+                    noiseSource.disconnect();
+                } catch (e) {}
+                try {
+                    filter.disconnect();
+                } catch (e) {}
+                try {
+                    layerGain.disconnect();
+                } catch (e) {}
+                try {
+                    burstLfo.stop();
+                    burstLfo.disconnect();
+                } catch (e) {}
+            });
+            this.treeNoiseSources = null;
+        }
+        
+        if (this.treeGain) {
+            try {
+                this.treeGain.disconnect();
+            } catch (e) {}
+            this.treeGain = null;
+        }
     }
     
     startWindSound() {
@@ -479,6 +508,90 @@ export class AudioManager {
         this.riverGain.connect(this.audioContext.destination);
         
         console.log('Grass+wind sound started successfully');
+    }
+    
+    startTreeNoiseSound() {
+        if (!this.audioContext) return;
+        
+        console.log('Starting tree noise sound');
+        
+        // Create tree noise sound with volume bursts
+        this.treeNoiseSources = [];
+        this.treeGain = this.audioContext.createGain();
+        this.treeGain.gain.value = 0.15; // Slightly quieter than grass
+        
+        // Create 3 different tree layers (rustling leaves, branches, creaks)
+        for (let i = 0; i < 3; i++) {
+            const bufferSize = this.audioContext.sampleRate * 3;
+            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            // Generate different characteristics for each layer
+            for (let j = 0; j < bufferSize; j++) {
+                const amplitude = i === 0 ? 0.03 : i === 1 ? 0.025 : 0.02;
+                data[j] = (Math.random() * 2 - 1) * amplitude;
+            }
+            
+            const noiseSource = this.audioContext.createBufferSource();
+            noiseSource.buffer = buffer;
+            noiseSource.loop = true;
+            
+            // Create filters for tree effect (more mid-range than grass)
+            const filter = this.audioContext.createBiquadFilter();
+            if (i === 0) {
+                // Low frequency tree creaks
+                filter.type = 'lowpass';
+                filter.frequency.value = 300;
+                filter.Q.value = 0.8;
+            } else if (i === 1) {
+                // Mid frequency leaf rustle
+                filter.type = 'bandpass';
+                filter.frequency.value = 1200;
+                filter.Q.value = 2.0;
+            } else {
+                // Higher frequency twig snaps
+                filter.type = 'highpass';
+                filter.frequency.value = 2000;
+                filter.Q.value = 1.2;
+            }
+            
+            // Create LFO for volume bursts (wind gusts through trees)
+            const burstLfo = this.audioContext.createOscillator();
+            const burstLfoGain = this.audioContext.createGain();
+            
+            burstLfo.frequency.value = 0.2 + i * 0.1; // Different rates for each layer
+            burstLfo.type = 'sine';
+            burstLfoGain.gain.value = 0.3;
+            
+            // Create gain for this layer
+            const layerGain = this.audioContext.createGain();
+            layerGain.gain.value = 0.4;
+            
+            // Connect LFO to layer gain for volume modulation
+            burstLfo.connect(burstLfoGain);
+            burstLfoGain.connect(layerGain.gain);
+            
+            // Connect audio graph
+            noiseSource.connect(filter);
+            filter.connect(layerGain);
+            layerGain.connect(this.treeGain);
+            
+            // Start sources
+            noiseSource.start();
+            burstLfo.start();
+            
+            // Store references to stop later
+            this.treeNoiseSources.push({
+                noiseSource: noiseSource,
+                filter: filter,
+                layerGain: layerGain,
+                burstLfo: burstLfo
+            });
+        }
+        
+        this.treeGain.connect(this.audioContext.destination);
+        
+        console.log('Tree noise sound started successfully');
     }
     
     startWindHowlSound() {

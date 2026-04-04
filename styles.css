@@ -34,16 +34,22 @@
     width: 100%;
     height: 100%;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     z-index: 20;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    overflow-y: auto;
+    padding: 20px 0;
 }
 
 .start-content {
     text-align: center;
     color: white;
     animation: fadeInUp 1s ease-out;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    padding-bottom: 40px;
 }
 
 .start-title {
@@ -60,6 +66,124 @@
     margin-bottom: 2rem;
     opacity: 0.9;
     text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.seo-content {
+    text-align: left;
+    margin: 2rem 0;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.seo-heading {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    text-align: center;
+    color: #fff;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.seo-description {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.feature {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1.5rem;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.feature h3 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
+    color: #fff;
+}
+
+.feature p {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sound-types, .benefits, .use-cases {
+    margin-bottom: 2rem;
+}
+
+.sound-types h3, .benefits h3, .use-cases h3 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #fff;
+    text-align: center;
+}
+
+.sound-types ul, .benefits ul {
+    list-style: none;
+    padding: 0;
+}
+
+.sound-types li, .benefits li {
+    font-size: 1rem;
+    line-height: 1.6;
+    margin-bottom: 0.8rem;
+    color: rgba(255, 255, 255, 0.9);
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.sound-types li::before, .benefits li::before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #4fc3f7;
+    font-weight: bold;
+}
+
+.use-case-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.use-case {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.seo-footer {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.seo-note {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    font-style: italic;
 }
 
 .start-btn {
@@ -205,18 +329,25 @@
 
 .weather-app[data-weather="windy"] {
     background: 
-        radial-gradient(ellipse at 30% 20%, rgba(40, 40, 40, 0.4) 0%, transparent 60%),
-        linear-gradient(to bottom, #0a0a0a 0%, #2d3748 40%, #4a5568 67%, #1a202c 100%);
+        radial-gradient(ellipse at 50% 20%, rgba(180, 180, 180, 0.3) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 15%, rgba(200, 200, 200, 0.2) 0%, transparent 60%),
+        linear-gradient(to bottom, #4a5568 0%, #718096 40%, #a0aec0 67%, #718096 100%);
 }
 
 .weather-app[data-weather="rain"] {
     background: 
-        radial-gradient(ellipse at 60% 40%, rgba(150, 150, 150, 0.2) 0%, transparent 70%),
-        linear-gradient(to bottom, #4a5568 0%, #718096 40%, #a0aec0 67%, #718096 100%);
+        radial-gradient(ellipse at 60% 40%, rgba(120, 120, 130, 0.2) 0%, transparent 70%),
+        linear-gradient(to bottom, #2d3748 0%, #4a5568 40%, #718096 67%, #4a5568 100%);
 }
 
 .weather-app[data-weather="thunder"] {
-    background: linear-gradient(to bottom, #000000 0%, #1a202c 40%, #4a5568 67%, #1a1a1a 100%);
+    background: 
+        radial-gradient(ellipse at 10% 15%, rgba(20, 20, 30, 0.8) 0%, transparent 40%),
+        radial-gradient(ellipse at 85% 12%, rgba(25, 25, 35, 0.7) 0%, transparent 45%),
+        radial-gradient(ellipse at 5% 25%, rgba(15, 15, 25, 0.6) 0%, transparent 35%),
+        radial-gradient(ellipse at 90% 30%, rgba(30, 30, 40, 0.5) 0%, transparent 40%),
+        radial-gradient(ellipse at 15% 35%, rgba(20, 20, 30, 0.6) 0%, transparent 35%),
+        linear-gradient(to bottom, #000000 0%, #1a202c 40%, #4a5568 67%, #1a1a1a 100%);
 }
 
 .weather-app[data-weather="foggy"] {

@@ -70,15 +70,46 @@ class Particle {
                 break;
                 
             case 'windy':
-                this.vx = Math.random() * 8 + 4; // Increased from 4+2 to 8+4
-                this.vy = Math.random() * 6 + 4; // Increased from 3+2 to 6+4
-                this.size = Math.random() * 2 + 1;
-                this.opacity = Math.random() * 0.5 + 0.3;
-                this.swayAmount = Math.random() * 8 + 4; // Increased sway amount
-                this.swaySpeed = Math.random() * 0.05 + 0.02;
+                // Autumn falling leaves
+                this.x = Math.random() * canvasWidth;
+                this.y = Math.random() * canvasHeight;
+                this.vx = Math.random() * 6 + 4; // Wind movement
+                this.vy = Math.random() * 2 + 1; // Gentle falling
+                this.size = Math.random() * 8 + 4; // Larger leaf size
+                this.opacity = Math.random() * 0.4 + 0.6; // Good visibility
+                this.swayAmount = Math.random() * 6 + 4; // More sway for leaves
+                this.swaySpeed = Math.random() * 0.03 + 0.01;
                 this.swayAngle = Math.random() * Math.PI * 2;
+                this.rotation = Math.random() * Math.PI * 2; // Random initial rotation
+                this.rotationSpeed = (Math.random() - 0.5) * 0.1; // Rotation speed
+                this.leafColor = this.getRandomLeafColor(); // Autumn leaf color
+                this.leafType = Math.floor(Math.random() * 3); // Different leaf shapes
                 break;
         }
+    }
+    
+    getRandomLeafColor() {
+        const autumnColors = [
+            '#8B7355', // Muted brown
+            '#A0826D', // Light brown
+            '#BC9A6A', // Sandy brown
+            '#C4A57B', // Beige
+            '#9B866C', // Tan
+            '#7A6A50', // Dark tan
+            '#8B7D6B', // Olive brown
+            '#9C8B7A', // Dusty brown
+            '#CD853F', // Peru (muted)
+            '#DEB887', // Burlywood
+            '#D2B48C', // Tan
+            '#BDB76B', // Khaki
+            '#BDB76B', // Dark khaki
+            '#8B7355', // Muted brown
+            '#A0826D', // Light brown
+            '#9C8B7A', // Dusty brown
+            '#8B7D6B', // Olive brown
+            '#7A6A50'  // Dark tan
+        ];
+        return autumnColors[Math.floor(Math.random() * autumnColors.length)];
     }
     
     update(canvasWidth, canvasHeight, weatherType, deltaTime = 0) {
@@ -171,14 +202,83 @@ class Particle {
             case 'windy':
                 this.x += (this.vx + Math.sin(this.swayAngle) * this.swayAmount) * dt * 60;
                 this.y += this.vy * dt * 60;
+                this.rotation += this.rotationSpeed * dt * 60; // Update rotation
                 
-                // Wrap windy particles both horizontally and vertically
+                // Wrap leaves horizontally, reset from top when falling off bottom
                 if (this.x > canvasWidth + 50) this.x = -50;
                 if (this.x < -50) this.x = canvasWidth + 50;
-                if (this.y > canvasHeight + 50) this.y = -50;
-                if (this.y < -50) this.y = canvasHeight + 50;
+                
+                // Reset from top when falling off bottom (like falling leaves)
+                if (this.y > canvasHeight + 50) {
+                    this.y = -50;
+                    this.x = Math.random() * canvasWidth;
+                }
                 break;
         }
+    }
+    
+    drawLeaf(ctx, color = null) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rotation);
+        
+        ctx.fillStyle = color || this.leafColor;
+        ctx.strokeStyle = color || this.leafColor;
+        ctx.lineWidth = 1;
+        
+        switch (this.leafType) {
+            case 0: // Maple leaf shape
+                this.drawMapleLeaf(ctx);
+                break;
+            case 1: // Oak leaf shape
+                this.drawOakLeaf(ctx);
+                break;
+            case 2: // Simple elliptical leaf
+                this.drawSimpleLeaf(ctx);
+                break;
+        }
+        
+        ctx.restore();
+    }
+    
+    drawMapleLeaf(ctx) {
+        const scale = this.size / 4;
+        ctx.scale(scale, scale);
+        
+        ctx.beginPath();
+        // Simplified maple leaf - just a basic shape
+        ctx.moveTo(0, -6);
+        ctx.lineTo(-4, -2);
+        ctx.lineTo(-6, 2);
+        ctx.lineTo(-2, 4);
+        ctx.lineTo(2, 4);
+        ctx.lineTo(6, 2);
+        ctx.lineTo(4, -2);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    drawOakLeaf(ctx) {
+        const scale = this.size / 4;
+        ctx.scale(scale, scale);
+        
+        ctx.beginPath();
+        // Simplified oak leaf - basic teardrop
+        ctx.moveTo(0, -6);
+        ctx.bezierCurveTo(-4, -3, -4, 3, 0, 6);
+        ctx.bezierCurveTo(4, 3, 4, -3, 0, -6);
+        ctx.closePath();
+        ctx.fill();
+    }
+    
+    drawSimpleLeaf(ctx) {
+        const scale = this.size / 4;
+        ctx.scale(scale, scale);
+        
+        ctx.beginPath();
+        // Very simple leaf shape
+        ctx.ellipse(0, 0, 2, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
     }
     
     draw(ctx, color = null) {
@@ -230,7 +330,6 @@ class Particle {
                 break;
                 
             case 'snow':
-            case 'windy':
                 // Draw snowflake
                 ctx.fillStyle = color || '#ffffff';
                 ctx.shadowBlur = 10;
@@ -238,6 +337,11 @@ class Particle {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                 ctx.fill();
+                break;
+                
+            case 'windy':
+                // Draw autumn leaf
+                this.drawLeaf(ctx, color);
                 break;
                 
             case 'rain':
@@ -277,13 +381,17 @@ export class WeatherRenderer {
         this.canvasWidth = width;
         this.canvasHeight = height;
         
-        // Recreate particles with new dimensions
-        if (this.particles.length > 0) {
-            this.createParticles();
-        }
+        // Don't recreate particles on resize - just update canvas dimensions
+        // Particles will adapt to new dimensions in their update methods
     }
     
     setWeather(weather, particleCount) {
+        // Only recreate particles if weather actually changes or particle count changes
+        // But always create particles on first load (when particles array is empty)
+        if (this.currentWeather === weather && this.particleCount === particleCount && this.particles.length > 0) {
+            return; // Same weather with existing particles, don't reset
+        }
+        
         this.currentWeather = weather;
         this.particleCount = particleCount;
         this.createParticles();
