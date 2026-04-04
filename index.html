@@ -119,17 +119,20 @@
             }
         }
 
-        // Animation loop with optimized clearing
-        function animate() {
+        // Animation loop with optimized clearing using requestAnimationFrame
+        function animate(timestamp) {
+            if (!timestamp) timestamp = performance.now();
+            
             // Use composite operation for better performance than clearRect
             ctx.globalCompositeOperation = 'source-over';
             
             // Update and draw snowflakes in a single pass
             let activeCount = 0;
+            const activeSnowflakes = [];
             for (const flake of snowflakes) {
                 const shouldKeep = flake.update();
                 if (shouldKeep) {
-                    flake.draw();
+                    activeSnowflakes.push(flake);
                     activeCount++;
                 } else {
                     // Remove dead snowflake to prevent memory buildup
@@ -139,6 +142,10 @@
                     }
                 }
             }
+
+            // Replace active snowflakes array for O(1) operations
+            snowflakes.length = 0;
+            snowflakes.push(...activeSnowflakes);
 
             // Add new snowflakes if we've lost too many
             while (snowflakes.length < getSnowflakeCount() && Math.random() > 0.95) {
@@ -162,7 +169,7 @@
         // Handle window resizing
         window.addEventListener('resize', resizeCanvas);
         
-        // Performance monitoring
+        // Performance monitoring using requestAnimationFrame for better accuracy
         let lastFrameTime = performance.now();
         function monitorPerformance() {
             const now = performance.now();
@@ -175,8 +182,33 @@
             }
         }
 
+        // Start performance monitoring using setInterval for periodic updates
+        let monitorIntervalId = null;
+        function startPerformanceMonitoring() {
+            if (monitorIntervalId) {
+                clearInterval(monitorIntervalId);
+            }
+            monitorIntervalId = setInterval(() => {
+                const now = performance.now();
+                const delta = now - lastFrameTime;
+                
+                if (delta >= 1000) {
+                    const fps = Math.round(1000 / delta);
+                    console.log(`FPS: ${fps}, Active snowflakes: ${snowflakes.length}`);
+                    lastFrameTime = now;
+                }
+            }, 1000);
+        }
+
         // Start performance monitoring
-        setInterval(monitorPerformance, 1000);
+        startPerformanceMonitoring();
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (monitorIntervalId) {
+                clearInterval(monitorIntervalId);
+            }
+        });
     </script>
 </body>
 </html>
