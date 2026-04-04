@@ -363,70 +363,119 @@
 }
 
 .weather-app[data-weather="cloudy"] {
-    background: linear-gradient(to bottom, #1f2937 0%, #2c3e50 50%, #34495e 100%);
+background: linear-gradient(to bottom, #1f2937 0%, #2c3e50 50%, #34495e 100%);
 }
 
 /* Responsive design */
 @media (max-width: 768px) {
-    .start-title {
-        font-size: 2.5rem;
-    }
+.start-title {
+font-size: 2.5rem;
+}
     
-    .start-subtitle {
-        font-size: 1rem;
-    }
+.start-subtitle {
+font-size: 1rem;
+}
     
-    .start-btn {
-        padding: 14px 32px;
-        font-size: 1rem;
-    }
+.start-btn {
+padding: 14px 32px;
+font-size: 1rem;
+}
     
-    .weather-info {
-        top: 15px;
-        left: 15px;
-        padding: 16px 20px;
-    }
+.weather-info {
+top: 15px;
+left: 15px;
+padding: 16px 20px;
+}
     
-    .app-title {
-        font-size: 1.2rem;
-    }
+.app-title {
+font-size: 1.2rem;
+}
     
-    .weather-controls {
-        bottom: 20px;
-        padding: 12px 16px;
-        gap: 4px;
-    }
+.weather-controls {
+bottom: 20px;
+padding: 10px 12px;
+gap: 3px;
+max-width: calc(100vw - 40px);
+overflow-x: auto;
+justify-content: flex-start;
+flex-wrap: nowrap;
+}
     
-    .weather-btn {
-        padding: 10px 16px;
-        min-width: 70px;
-    }
+.weather-btn {
+padding: 8px 12px;
+min-width: 65px;
+flex-shrink: 0;
+}
     
-    .weather-icon {
-        font-size: 1.2rem;
-    }
+.weather-icon {
+font-size: 1.1rem;
+}
     
-    .weather-label {
-        font-size: 0.65rem;
-    }
+.weather-label {
+font-size: 0.6rem;
+letter-spacing: 0.02em;
+}
 }
 
 @media (max-width: 480px) {
-    .start-title {
-        font-size: 2rem;
-    }
+.start-title {
+font-size: 2rem;
+}
     
-    .weather-controls {
-        gap: 2px;
-        padding: 10px 12px;
-    }
+.weather-controls {
+bottom: 15px;
+left: 20px;
+right: 20px;
+transform: none;
+padding: 8px 10px;
+gap: 2px;
+border-radius: 25px;
+overflow-x: auto;
+justify-content: flex-start;
+flex-wrap: nowrap;
+scrollbar-width: none;
+-ms-overflow-style: none;
+}
     
-    .weather-btn {
-        padding: 8px 12px;
-        min-width: 60px;
-    }
+.weather-controls::-webkit-scrollbar {
+display: none;
+}
     
-    .weather-label {
-        display: none;
-    }
+.weather-btn {
+padding: 6px 10px;
+min-width: 58px;
+flex-shrink: 0;
+}
+    
+.weather-icon {
+font-size: 1rem;
+}
+    
+.weather-label {
+font-size: 0.55rem;
+line-height: 1.2;
+}
+}
+
+@media (max-width: 360px) {
+.weather-controls {
+bottom: 10px;
+left: 15px;
+right: 15px;
+padding: 6px 8px;
+gap: 1px;
+}
+    
+.weather-btn {
+padding: 5px 8px;
+min-width: 52px;
+}
+    
+.weather-icon {
+font-size: 0.9rem;
+}
+    
+.weather-label {
+font-size: 0.5rem;
+}
 }
