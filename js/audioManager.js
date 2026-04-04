@@ -85,6 +85,9 @@ export class AudioManager {
             case 'foggy':
                 this.startSirenSound();
                 break;
+            case 'ocean':
+                this.startOceanSound();
+                break;
         }
     }
     
@@ -329,6 +332,34 @@ export class AudioManager {
                 this.treeGain.disconnect();
             } catch (e) {}
             this.treeGain = null;
+        }
+        
+        // Cleanup ocean noise sources
+        if (this.oceanNoiseSources) {
+            this.oceanNoiseSources.forEach(({ noiseSource, filter, gain, lfo }) => {
+                try {
+                    noiseSource.stop();
+                    noiseSource.disconnect();
+                } catch (e) {}
+                try {
+                    filter.disconnect();
+                } catch (e) {}
+                try {
+                    gain.disconnect();
+                } catch (e) {}
+                try {
+                    lfo.stop();
+                    lfo.disconnect();
+                } catch (e) {}
+            });
+            this.oceanNoiseSources = null;
+        }
+        
+        if (this.oceanGain) {
+            try {
+                this.oceanGain.disconnect();
+            } catch (e) {}
+            this.oceanGain = null;
         }
     }
     
@@ -592,6 +623,97 @@ export class AudioManager {
         this.treeGain.connect(this.audioContext.destination);
         
         console.log('Tree noise sound started successfully');
+    }
+    
+    startOceanSound() {
+        if (!this.audioContext) return;
+        
+        console.log('Starting ocean sound');
+        
+        // Create ocean sound with multiple layers for realistic seashore effect
+        this.oceanNoiseSources = [];
+        this.oceanGain = this.audioContext.createGain();
+        this.oceanGain.gain.value = 0.25;
+        
+        // Create 3 different ocean layers for realistic waves
+        for (let i = 0; i < 3; i++) {
+            const bufferSize = this.audioContext.sampleRate * 5; // Longer buffer for variety
+            const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            // Generate different characteristics for each layer
+            for (let j = 0; j < bufferSize; j++) {
+                const amplitude = i === 0 ? 0.06 : i === 1 ? 0.04 : 0.03;
+                data[j] = (Math.random() * 2 - 1) * amplitude;
+            }
+            
+            const noiseSource = this.audioContext.createBufferSource();
+            noiseSource.buffer = buffer;
+            noiseSource.loop = true;
+            
+            // Create filters for ocean wave effect
+            const filter = this.audioContext.createBiquadFilter();
+            if (i === 0) {
+                // Low frequency ocean rumble (deep waves)
+                filter.type = 'lowpass';
+                filter.frequency.value = 300;
+                filter.Q.value = 0.8;
+            } else if (i === 1) {
+                // Mid frequency wave crash
+                filter.type = 'bandpass';
+                filter.frequency.value = 800;
+                filter.Q.value = 1.5;
+            } else {
+                // High frequency foam and hiss
+                filter.type = 'highpass';
+                filter.frequency.value = 2000;
+                filter.Q.value = 0.5;
+            }
+            
+            // Create LFO for wave rhythm with random pace
+            const lfo = this.audioContext.createOscillator();
+            lfo.frequency.value = 0.1 + Math.random() * 0.15; // Random pace between 0.1-0.25 Hz
+            lfo.type = 'sine';
+            
+            const lfoGain = this.audioContext.createGain();
+            
+            // Create envelope for wave fade in/out (log fade)
+            const waveEnvelope = this.audioContext.createGain();
+            waveEnvelope.gain.value = 0.3; // Base volume
+            
+            // Connect LFO to create rising/falling wave effect
+            lfo.connect(lfoGain);
+            lfoGain.gain.value = 0.4; // Modulation depth
+            
+            // Apply logarithmic-like envelope by modulating the gain
+            lfoGain.connect(waveEnvelope.gain);
+            
+            // Create gain for this layer
+            const layerGain = this.audioContext.createGain();
+            layerGain.gain.value = i === 0 ? 0.5 : i === 1 ? 0.7 : 0.4;
+            
+            // Connect audio graph
+            noiseSource.connect(filter);
+            filter.connect(waveEnvelope);
+            waveEnvelope.connect(layerGain);
+            layerGain.connect(this.oceanGain);
+            
+            // Start the noise and LFO
+            noiseSource.start();
+            lfo.start();
+            
+            // Store references to stop later
+            this.oceanNoiseSources.push({
+                noiseSource: noiseSource,
+                filter: filter,
+                gain: layerGain,
+                lfo: lfo
+            });
+        }
+        
+        this.oceanGain.connect(this.audioContext.destination);
+        
+        console.log('Ocean sound started successfully');
     }
     
     startWindHowlSound() {

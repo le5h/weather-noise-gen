@@ -224,39 +224,6 @@
     }
 }
 
-/* Weather info header */
-.weather-info {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    z-index: 10;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(20px);
-    border-radius: 16px;
-    padding: 20px 24px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.app-title {
-    color: rgba(255, 255, 255, 0.95);
-    font-size: 1.5rem;
-    font-weight: 600;
-    margin-bottom: 8px;
-    letter-spacing: -0.02em;
-}
-
-.weather-status {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-#weatherDisplay {
-    color: #fff;
-    font-weight: 600;
-}
-
 /* Weather controls navigation */
 .weather-controls {
     position: absolute;
@@ -352,6 +319,47 @@
 
 .weather-app[data-weather="foggy"] {
     background: linear-gradient(to bottom, #d3d3d3 0%, #b8b8b8 50%, #808080 100%);
+}
+
+.weather-app[data-weather="ocean"] {
+    background:
+        /* Water reflection layer - stronger near horizon */
+        linear-gradient(to bottom, 
+            transparent 0%,
+            transparent 49%,
+            rgba(168, 137, 168, 0.15) 50.1%,    /* Warm pinkish-purple reflection */
+            rgba(139, 107, 157, 0.12) 60%,       /* Lighter purple reflection */
+            rgba(107, 76, 138, 0.08) 70%,         /* Warm purple-blue reflection */
+            rgba(74, 44, 125, 0.05) 80%,          /* Purple-blue reflection */
+            rgba(45, 27, 105, 0.02) 90%,          /* Deep twilight reflection */
+            transparent 100%),
+        /* Base marine water */
+        linear-gradient(to bottom, 
+            #1a1a2e 0%,      /* Very dark blue-purple top */
+            #2d1b69 15%,     /* Deep twilight purple */
+            #4a2c7d 30%,     /* Purple-blue mix */
+            #6b4c8a 40%,     /* Warm purple-blue */
+            #8b6b9d 45%,     /* Lighter purple with warmth */
+            #a889a8 49.9%,   /* Warm pinkish-purple near horizon */
+            #1e4a6b 50.1%,   /* Marine water start */
+            #2c5f7d 75%,     /* Marine water middle */
+            #1a4d66 100%);   /* Deeper marine water bottom */
+    position: relative;
+}
+
+.weather-app[data-weather="ocean"]::before {
+    content: '';
+    position: absolute;
+    top: 49.95%;
+    left: 0;
+    right: 0;
+    height: 0.1vh;
+    background: linear-gradient(90deg,
+        rgba(255, 255, 255, 0.1) 0%, 
+        rgba(255, 255, 255, 0.3) 50%, 
+        rgba(255, 255, 255, 0.1) 100%);
+    z-index: 2;
+    pointer-events: none;
 }
 
 .weather-app[data-weather="cloudy"] {

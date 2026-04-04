@@ -10,12 +10,10 @@ class WeatherApp {
     constructor() {
         this.canvas = document.getElementById('weatherCanvas');
         this.ctx = this.canvas.getContext('2d');
-        this.weatherDisplay = document.getElementById('weatherDisplay');
         this.weatherButtons = document.querySelectorAll('.weather-btn');
         this.weatherApp = document.querySelector('.weather-app');
         this.startScreen = document.getElementById('startScreen');
         this.startBtn = document.getElementById('startBtn');
-        this.weatherInfo = document.querySelector('.weather-info');
         this.weatherControls = document.querySelector('.weather-controls');
         
         this.currentWeather = 'snow';
@@ -53,6 +51,11 @@ class WeatherApp {
                 name: 'Foggy Ash',
                 particles: 180,
                 background: 'foggy'
+            },
+            ocean: {
+                name: 'Ocean Waves',
+                particles: 250,
+                background: 'ocean'
             }
         };
         
@@ -69,7 +72,6 @@ class WeatherApp {
     
     showStartScreen() {
         this.startScreen.style.display = 'flex';
-        this.weatherInfo.style.display = 'none';
         this.weatherControls.style.display = 'none';
     }
     
@@ -90,7 +92,6 @@ class WeatherApp {
         
         setTimeout(() => {
             this.startScreen.style.display = 'none';
-            this.weatherInfo.style.display = 'block';
             this.weatherControls.style.display = 'flex';
             
             // Initialize audio and start weather
@@ -171,9 +172,6 @@ class WeatherApp {
         this.weatherButtons.forEach(button => {
             button.classList.toggle('active', button.dataset.weather === weather);
         });
-        
-        // Update weather display
-        this.weatherDisplay.textContent = this.weatherConfig[weather].name;
     }
     
     startAnimation() {

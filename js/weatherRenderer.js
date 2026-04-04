@@ -85,6 +85,74 @@ class Particle {
                 this.leafColor = this.getRandomLeafColor(); // Autumn leaf color
                 this.leafType = Math.floor(Math.random() * 3); // Different leaf shapes
                 break;
+                
+            case 'ocean':
+                // Ocean shimmer particles with specified requirements
+                // Y position with falling distribution - more particles near horizon
+                const centerBias = Math.random() < 0.7; // 70% chance to spawn near horizon
+                if (centerBias) {
+                    // Y near horizon with gaussian-like distribution
+                    const centerY = canvasHeight * 0.5; // Horizon line
+                    const spreadY = Math.random() * canvasHeight * 0.15; // 15% height spread below horizon
+                    
+                    this.x = Math.random() * canvasWidth; // X completely random
+                    this.y = centerY + Math.random() * spreadY;
+                } else {
+                    // Spawn anywhere in water area
+                    this.x = Math.random() * canvasWidth; // X completely random
+                    this.y = canvasHeight * 0.5 + Math.random() * canvasHeight * 0.5;
+                }
+                
+                // Vertical position determines thickness: 50% = near 0px, 100% = 12px
+                const verticalPosition = (this.y - canvasHeight * 0.5) / (canvasHeight * 0.5); // 0 to 1
+                const thickness = 0.1 + verticalPosition * 11.9; // 0.1px to 12px (near zero at horizon)
+                
+                // Deterministic properties: horizon = almost 0, lower = bigger, lower = faster
+                // Using vertical position where higher (closer to 100% bottom) = bigger and faster
+                const distanceFactor = verticalPosition; // 0 at 50%, 1 at 100% - so higher = faster/bigger
+                
+                // Base size and speed with deterministic relationship
+                const baseSpeed = 0.033 + distanceFactor * 1.3; // 0.033-1.33 range, 3x slower
+                const baseSize = thickness * (0.5 + distanceFactor * 0.5); // Size based on thickness + position
+                
+                // Apply variations: 20% size, 5% speed
+                const sizeVariation = 1 + (Math.random() - 0.5) * 0.4; // 80%-120% of base size
+                const speedVariation = 1 + (Math.random() - 0.5) * 0.1; // 95%-105% of base speed
+                
+                // Direction: left to right or right to left
+                const direction = Math.random() < 0.5 ? 1 : -1;
+                
+                this.vx = baseSpeed * speedVariation * direction;
+                this.vy = 0; // No vertical movement
+                
+                this.baseSize = baseSize * sizeVariation;
+                this.size = this.baseSize;
+                this.thickness = thickness; // Store thickness for shamshed ellipse
+                
+                // Shimmer properties for size changes while moving
+                this.shimmerPhase = Math.random() * Math.PI * 2;
+                this.shimmerSpeed = Math.random() * 0.04 + 0.02; // Speed of size change
+                this.shimmerAmount = Math.random() * 0.3 + 0.2; // Amplitude of size change
+                
+                // Ocean shimmer colors based on sky but brighter than water
+                const reflectionIntensity = 1 - verticalPosition * 0.7; // More reflection near horizon
+                
+                // Sky colors but ensure they're brighter than marine water
+                const skyColors = [
+                    { r: 200, g: 170, b: 180 }, // Bright warm pinkish-purple
+                    { r: 180, g: 150, b: 170 }, // Bright lighter purple  
+                    { r: 160, g: 130, b: 160 }, // Bright warm purple-blue
+                    { r: 140, g: 110, b: 150 }, // Bright purple-blue
+                    { r: 120, g: 90, b: 130 }    // Bright twilight purple
+                ];
+                
+                const colorChoice = skyColors[Math.floor(Math.random() * skyColors.length)];
+                const brightness = 1.2 + reflectionIntensity * 0.3; // 1.2 to 1.5 brightness
+                
+                this.particleColor = `rgba(${Math.min(255, colorChoice.r * brightness)}, ${Math.min(255, colorChoice.g * brightness)}, ${Math.min(255, colorChoice.b * brightness)}, ${0.3 + reflectionIntensity * 0.15})`;
+                
+                this.opacity = 0.2 + reflectionIntensity * 0.2; // Much more subtle
+                break;
         }
     }
     
@@ -213,6 +281,18 @@ class Particle {
                     this.y = -50;
                     this.x = Math.random() * canvasWidth;
                 }
+                break;
+                
+            case 'ocean':
+                this.shimmerPhase += this.shimmerSpeed * dt * 60;
+                this.x += this.vx * dt * 60; // Horizontal movement only
+                
+                // Size changes over time to imitate shimmer
+                this.size = this.baseSize * (1 + Math.sin(this.shimmerPhase) * this.shimmerAmount);
+                
+                // Wrap horizontally
+                if (this.x > canvasWidth + 50) this.x = -50;
+                if (this.x < -50) this.x = canvasWidth + 50;
                 break;
         }
     }
@@ -354,6 +434,21 @@ class Particle {
                 ctx.lineTo(this.x - this.vx * 0.5, this.y - this.length);
                 ctx.stroke();
                 break;
+                
+            case 'ocean':
+                // Draw ocean shimmer particle as shamshed ellipse with thickness-based rendering
+                ctx.fillStyle = color || this.particleColor;
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.6)';
+                ctx.beginPath();
+                
+                // Create shamshed ellipse: very wide and thin based on thickness
+                const ellipseWidth = Math.max(0.1, this.size * 4); // Very wide for shamshed effect
+                const ellipseHeight = Math.max(0.1, this.thickness * 0.3); // Use thickness for height
+                
+                ctx.ellipse(this.x, this.y, ellipseWidth, ellipseHeight, 0, 0, Math.PI * 2);
+                ctx.fill();
+                break;
         }
         
         ctx.restore();
@@ -420,6 +515,9 @@ export class WeatherRenderer {
                 break;
             case 'windy':
                 particleType = 'windy';
+                break;
+            case 'ocean':
+                particleType = 'ocean';
                 break;
             default:
                 particleType = 'snow';
