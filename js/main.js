@@ -14,12 +14,14 @@ class WeatherApp {
         this.weatherApp = document.querySelector('.weather-app');
         this.startScreen = document.getElementById('startScreen');
         this.startBtn = document.getElementById('startBtn');
+        this.backBtn = document.getElementById('backBtn');
         this.weatherControls = document.querySelector('.weather-controls');
         
         this.currentWeather = 'snow';
         this.renderer = new WeatherRenderer(this.canvas);
         this.audioManager = new AudioManager();
         this.isStarted = false;
+        this.animationId = null;
         
         this.weatherConfig = {
             sunny: {
@@ -75,6 +77,39 @@ class WeatherApp {
         this.weatherControls.style.display = 'none';
     }
     
+    backToStart() {
+        // Stop animation loop
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = null;
+        }
+        
+        // Stop all sounds
+        this.audioManager.stopAllSounds();
+        
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        
+        // Reset weather renderer
+        this.renderer.reset();
+        
+        // Reset state
+        this.isStarted = false;
+        
+        // Reset background to default
+        this.weatherApp.dataset.weather = 'snow';
+        
+        // Show start screen with fade effect
+        this.startScreen.style.opacity = '0';
+        this.startScreen.style.display = 'flex';
+        this.startScreen.style.transition = 'opacity 0.3s ease-in';
+        
+        setTimeout(() => {
+            this.startScreen.style.opacity = '1';
+            this.weatherControls.style.display = 'none';
+        }, 50);
+    }
+    
     startExperience() {
         this.isStarted = true;
         
@@ -122,6 +157,11 @@ class WeatherApp {
         // Start button click
         this.startBtn.addEventListener('click', () => {
             this.startExperience();
+        });
+        
+        // Back button click
+        this.backBtn.addEventListener('click', () => {
+            this.backToStart();
         });
         
         // Weather button clicks
@@ -185,10 +225,10 @@ class WeatherApp {
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
             this.renderer.update(deltaTime);
             this.renderer.draw(this.ctx);
-            requestAnimationFrame(animate);
+            this.animationId = requestAnimationFrame(animate);
         };
         
-        requestAnimationFrame(animate);
+        this.animationId = requestAnimationFrame(animate);
     }
 }
 

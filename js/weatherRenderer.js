@@ -528,6 +528,26 @@ export class WeatherRenderer {
         }
     }
     
+    reset() {
+        // Clear all particles
+        this.particles = [];
+        
+        // Reset lightning state
+        this.lightning = {
+            active: false,
+            x: 0,
+            y: 0,
+            endX: 0,
+            endY: 0,
+            opacity: 0,
+            branches: []
+        };
+        
+        // Reset weather to default
+        this.currentWeather = 'snow';
+        this.particleCount = 0;
+    }
+    
     update(deltaTime = 0) {
         this.particles.forEach(particle => {
             particle.update(this.canvasWidth, this.canvasHeight, this.currentWeather, deltaTime);
