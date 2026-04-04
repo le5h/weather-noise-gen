@@ -774,8 +774,8 @@ export class AudioManager {
         
         // High-pass filter to simulate poor low-frequency hearing at distance
         highPassFilter.type = 'highpass';
-        highPassFilter.frequency.value = sirenConfig.filters.highpass.freq;
-        highPassFilter.Q.value = sirenConfig.filters.highpass.q;
+        highPassFilter.frequency.value = 400; // Increased from 200 to mute more low frequencies
+        highPassFilter.Q.value = 0.8; // Higher Q for smoother transition
         
         // Insert filters in both paths
         this.sirenDryGain.disconnect();

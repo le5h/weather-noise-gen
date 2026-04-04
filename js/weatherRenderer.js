@@ -34,7 +34,7 @@ class Particle {
                 this.vx = (Math.random() - 0.5) * 3;
                 this.vy = Math.random() * 12 + 15;
                 this.size = Math.random() * 3 + 2;
-                this.opacity = Math.random() * 0.6 + 0.4;
+                this.opacity = Math.random() * 0.3 + 0.2; // Reduced from 0.6+0.4 to 0.3+0.2 for more transparency
                 this.length = Math.random() * 20 + 15;
                 break;
                 
