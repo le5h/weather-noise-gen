@@ -12,6 +12,8 @@ export class AudioManager {
         this.rainNoise = null;
         this.rainGain = null;
         this.initialized = false;
+        this.thunderWorker = null;
+        this.pendingThunder = null;
     }
     
     init() {
@@ -25,10 +27,30 @@ export class AudioManager {
                 this.audioContext.resume();
             }
             
+            // Initialize thunder worker
+            this.initThunderWorker();
+            
             this.initialized = true;
             console.log('Audio initialized successfully');
         } catch (error) {
             console.warn('Web Audio API not supported:', error);
+        }
+    }
+    
+    initThunderWorker() {
+        try {
+            this.thunderWorker = new Worker('./js/thunderWorker.js');
+            
+            this.thunderWorker.onmessage = (e) => {
+                if (e.data.type === 'thunderGenerated') {
+                    this.playThunderSound(e.data.audioData, e.data.reverbData, e.data.position);
+                }
+            };
+            
+            console.log('Thunder worker initialized successfully');
+        } catch (error) {
+            console.warn('Thunder worker not supported, falling back to main thread:', error);
+            this.thunderWorker = null;
         }
     }
     
@@ -519,121 +541,166 @@ export class AudioManager {
         this.thunderRainNoise.start();
         
         // Store thunder generation method
-        this.generateThunder = () => {
+        this.generateThunder = (positionData = null) => {
             const thunderDuration = 2 + Math.random() * 3; // Longer duration
-            const thunderBuffer = this.audioContext.createBuffer(1, this.audioContext.sampleRate * thunderDuration, this.audioContext.sampleRate);
-            const thunderData = thunderBuffer.getChannelData(0);
             
-            // Generate thunder as filtered noise (realistic approach)
-            for (let i = 0; i < thunderData.length; i++) {
-                const t = i / this.audioContext.sampleRate;
-                
-                // Generate base noise
-                let noise = (Math.random() * 2 - 1);
-                
-                // Apply time-varying lowpass filter effect in time domain
-                const cutoffFreq = 2000 * Math.exp(-t * 3) + 50; // Sweep from high to low
-                const filterStrength = Math.exp(-t * 2); // Reduce filtering over time
-                
-                // Simple lowpass filter approximation
-                if (i > 0) {
-                    const alpha = Math.exp(-2 * Math.PI * cutoffFreq / this.audioContext.sampleRate);
-                    thunderData[i] = thunderData[i - 1] * alpha + noise * (1 - alpha) * filterStrength;
-                } else {
-                    thunderData[i] = noise * filterStrength;
-                }
-                
-                // Complex envelope for realistic thunder
-                const attack = 0.05;
-                const decay = 0.4;
-                const sustain = 0.8;
-                const release = thunderDuration - attack - decay - sustain;
-                
-                let envelope;
-                if (t < attack) {
-                    envelope = t / attack;
-                } else if (t < attack + decay) {
-                    envelope = 1 - ((t - attack) / decay) * 0.4;
-                } else if (t < attack + decay + sustain) {
-                    envelope = 0.6 - ((t - attack - decay) / sustain) * 0.3;
-                } else {
-                    envelope = 0.3 * Math.exp(-((t - attack - decay - sustain) / release) * 2);
-                }
-                
-                // Apply envelope
-                thunderData[i] *= envelope * 0.8;
-                
-                // Add some low-frequency rumble
-                const rumble = Math.sin(2 * Math.PI * 40 * t) * 0.1 * Math.exp(-t);
-                thunderData[i] += rumble * envelope;
+            if (this.thunderWorker) {
+                // Use worker for non-blocking generation
+                this.thunderWorker.postMessage({
+                    type: 'generateThunder',
+                    sampleRate: this.audioContext.sampleRate,
+                    duration: thunderDuration,
+                    position: positionData
+                });
+            } else {
+                // Fallback to main thread generation
+                this.generateThunderMainThread(thunderDuration, positionData);
+            }
+        };
+        
+        console.log('Thunder sound started successfully');
+    }
+    
+    generateThunderMainThread(duration) {
+        // Fallback method for when worker is not available
+        const thunderBuffer = this.audioContext.createBuffer(1, this.audioContext.sampleRate * duration, this.audioContext.sampleRate);
+        const thunderData = thunderBuffer.getChannelData(0);
+        
+        // Generate thunder as filtered noise (realistic approach)
+        for (let i = 0; i < thunderData.length; i++) {
+            const t = i / this.audioContext.sampleRate;
+            
+            // Generate base noise
+            let noise = (Math.random() * 2 - 1);
+            
+            // Apply time-varying lowpass filter effect in time domain
+            const cutoffFreq = 2000 * Math.exp(-t * 3) + 50; // Sweep from high to low
+            const filterStrength = Math.exp(-t * 2); // Reduce filtering over time
+            
+            // Simple lowpass filter approximation
+            if (i > 0) {
+                const alpha = Math.exp(-2 * Math.PI * cutoffFreq / this.audioContext.sampleRate);
+                thunderData[i] = thunderData[i - 1] * alpha + noise * (1 - alpha) * filterStrength;
+            } else {
+                thunderData[i] = noise * filterStrength;
             }
             
-            const thunderSource = this.audioContext.createBufferSource();
-            thunderSource.buffer = thunderBuffer;
+            // Complex envelope for realistic thunder
+            const attack = 0.05;
+            const decay = 0.4;
+            const sustain = 0.8;
+            const release = duration - attack - decay - sustain;
             
-            // Create reverb effect using convolution (simplified)
-            const convolver = this.audioContext.createConvolver();
-            const reverbDuration = 4; // Longer reverb
+            let envelope;
+            if (t < attack) {
+                envelope = t / attack;
+            } else if (t < attack + decay) {
+                envelope = 1 - ((t - attack) / decay) * 0.4;
+            } else if (t < attack + decay + sustain) {
+                envelope = 0.6 - ((t - attack - decay) / sustain) * 0.3;
+            } else {
+                envelope = 0.3 * Math.exp(-((t - attack - decay - sustain) / release) * 2);
+            }
+            
+            // Apply envelope
+            thunderData[i] *= envelope * 0.8;
+            
+            // Add some low-frequency rumble
+            const rumble = Math.sin(2 * Math.PI * 40 * t) * 0.1 * Math.exp(-t);
+            thunderData[i] += rumble * envelope;
+        }
+        
+        this.playThunderSound(thunderData);
+    }
+    
+    playThunderSound(audioData, reverbData = null, positionData = null) {
+        // Create audio buffer from worker data
+        const duration = audioData.length / this.audioContext.sampleRate;
+        const thunderBuffer = this.audioContext.createBuffer(1, audioData.length, this.audioContext.sampleRate);
+        thunderBuffer.copyToChannel(audioData, 0);
+        
+        const thunderSource = this.audioContext.createBufferSource();
+        thunderSource.buffer = thunderBuffer;
+        
+        // Apply spatial audio based on lightning position
+        const panNode = this.audioContext.createStereoPanner();
+        const distanceGain = this.audioContext.createGain();
+        
+        if (positionData) {
+            // Apply panning based on lightning position
+            panNode.pan.value = positionData.pan; // -1 (left) to 1 (right)
+            
+            // Apply distance-based volume (closer = louder)
+            const distanceVolume = 1 - (positionData.distance * 0.5); // Reduce volume by up to 50% at edges
+            distanceGain.gain.value = Math.max(0.3, distanceVolume); // Minimum 30% volume
+        } else {
+            // Default center position
+            panNode.pan.value = 0;
+            distanceGain.gain.value = 0.6;
+        }
+        
+        // Create reverb effect using pre-generated data or fallback
+        const convolver = this.audioContext.createConvolver();
+        
+        if (reverbData) {
+            // Use pre-generated reverb from worker
+            const reverbDuration = 4;
+            const reverbBuffer = this.audioContext.createBuffer(2, reverbData.length / 2, this.audioContext.sampleRate);
+            reverbBuffer.copyToChannel(reverbData.slice(0, reverbData.length / 2), 0);
+            reverbBuffer.copyToChannel(reverbData.slice(reverbData.length / 2), 1);
+            convolver.buffer = reverbBuffer;
+        } else {
+            // Fallback: generate reverb on main thread (simplified)
+            const reverbDuration = 2; // Shorter for fallback
             const reverbBuffer = this.audioContext.createBuffer(2, this.audioContext.sampleRate * reverbDuration, this.audioContext.sampleRate);
             
-            // Generate more realistic reverb impulse response
             for (let channel = 0; channel < 2; channel++) {
                 const channelData = reverbBuffer.getChannelData(channel);
                 for (let i = 0; i < channelData.length; i++) {
                     const t = i / this.audioContext.sampleRate;
-                    // Exponential decay with some early reflections
-                    channelData[i] = (Math.random() * 2 - 1) * Math.exp(-t * 0.8) * 0.6;
-                    
-                    // Add early reflections
-                    if (i > this.audioContext.sampleRate * 0.03 && i < this.audioContext.sampleRate * 0.05) {
-                        channelData[i] += (Math.random() * 2 - 1) * 0.3;
-                    }
-                    if (i > this.audioContext.sampleRate * 0.08 && i < this.audioContext.sampleRate * 0.1) {
-                        channelData[i] += (Math.random() * 2 - 1) * 0.2;
-                    }
+                    channelData[i] = (Math.random() * 2 - 1) * Math.exp(-t * 1.2) * 0.4;
                 }
             }
-            
             convolver.buffer = reverbBuffer;
-            
-            // Apply additional filtering for thunder character
-            const thunderFilter = this.audioContext.createBiquadFilter();
-            thunderFilter.type = 'lowpass';
-            thunderFilter.frequency.setValueAtTime(2000, this.audioContext.currentTime);
-            thunderFilter.frequency.exponentialRampToValueAtTime(80, this.audioContext.currentTime + thunderDuration);
-            thunderFilter.Q.value = 1.5;
-            
-            // Add body filter for low-end weight
-            const bodyFilter = this.audioContext.createBiquadFilter();
-            bodyFilter.type = 'bandpass';
-            bodyFilter.frequency.value = 60;
-            bodyFilter.Q.value = 0.8;
-            
-            const thunderGain = this.audioContext.createGain();
-            thunderGain.gain.value = 0.6;
-            
-            // Create wet/dry mix with wetter reverb
-            const dryGain = this.audioContext.createGain();
-            dryGain.gain.value = 0.3; // Less dry signal
-            const wetGain = this.audioContext.createGain();
-            wetGain.gain.value = 0.7; // More wet signal (reverb)
-            
-            // Connect audio graph
-            thunderSource.connect(thunderFilter);
-            thunderFilter.connect(bodyFilter);
-            bodyFilter.connect(dryGain);
-            bodyFilter.connect(convolver);
-            convolver.connect(wetGain);
-            
-            dryGain.connect(thunderGain);
-            wetGain.connect(thunderGain);
-            thunderGain.connect(this.audioContext.destination);
-            
-            thunderSource.start();
-            thunderSource.stop(this.audioContext.currentTime + thunderDuration);
-        };
+        }
         
-        console.log('Thunder sound started successfully');
+        // Apply additional filtering for thunder character
+        const thunderFilter = this.audioContext.createBiquadFilter();
+        thunderFilter.type = 'lowpass';
+        thunderFilter.frequency.setValueAtTime(2000, this.audioContext.currentTime);
+        thunderFilter.frequency.exponentialRampToValueAtTime(80, this.audioContext.currentTime + duration);
+        thunderFilter.Q.value = 1.5;
+        
+        // Add body filter for low-end weight
+        const bodyFilter = this.audioContext.createBiquadFilter();
+        bodyFilter.type = 'bandpass';
+        bodyFilter.frequency.value = 60;
+        bodyFilter.Q.value = 0.8;
+        
+        const thunderGain = this.audioContext.createGain();
+        thunderGain.gain.value = 0.6;
+        
+        // Create wet/dry mix with wetter reverb
+        const dryGain = this.audioContext.createGain();
+        dryGain.gain.value = 0.3; // Less dry signal
+        const wetGain = this.audioContext.createGain();
+        wetGain.gain.value = 0.7; // More wet signal (reverb)
+        
+        // Connect audio graph with spatial processing
+        thunderSource.connect(thunderFilter);
+        thunderFilter.connect(bodyFilter);
+        bodyFilter.connect(distanceGain); // Apply distance-based volume
+        distanceGain.connect(dryGain);
+        bodyFilter.connect(convolver);
+        convolver.connect(wetGain);
+        
+        // Apply panning to both dry and wet signals
+        dryGain.connect(panNode);
+        wetGain.connect(panNode);
+        panNode.connect(this.audioContext.destination);
+        
+        thunderSource.start();
+        thunderSource.stop(this.audioContext.currentTime + duration);
     }
     
     startSirenSound() {

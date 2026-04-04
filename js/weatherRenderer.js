@@ -178,7 +178,7 @@ class Particle {
         }
     }
     
-    draw(ctx) {
+    draw(ctx, color = null) {
         ctx.save();
         ctx.globalAlpha = this.opacity;
         
@@ -207,7 +207,7 @@ class Particle {
                 
             case 'thunder':
                 // Draw heavy rain drops for thunderstorm
-                ctx.strokeStyle = 'rgba(200, 220, 255, 0.8)';
+                ctx.strokeStyle = color || 'rgba(200, 220, 255, 0.8)';
                 ctx.lineWidth = this.size;
                 ctx.lineCap = 'round';
                 ctx.beginPath();
@@ -218,7 +218,7 @@ class Particle {
                 
             case 'foggy':
                 // Draw dark ash particles with gray color for lighter background
-                ctx.fillStyle = 'rgba(60, 60, 60, 0.8)';
+                ctx.fillStyle = color || 'rgba(60, 60, 60, 0.8)';
                 ctx.shadowBlur = 3;
                 ctx.shadowColor = 'rgba(40, 40, 40, 0.2)';
                 ctx.beginPath();
@@ -229,7 +229,7 @@ class Particle {
             case 'snow':
             case 'windy':
                 // Draw snowflake
-                ctx.fillStyle = '#ffffff';
+                ctx.fillStyle = color || '#ffffff';
                 ctx.shadowBlur = 10;
                 ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
                 ctx.beginPath();
@@ -239,61 +239,13 @@ class Particle {
                 
             case 'rain':
                 // Draw rain drop
-                ctx.strokeStyle = '#ffffff';
+                ctx.strokeStyle = color || '#ffffff';
                 ctx.lineWidth = this.size;
                 ctx.lineCap = 'round';
                 ctx.beginPath();
                 ctx.moveTo(this.x, this.y);
                 ctx.lineTo(this.x - this.vx * 0.5, this.y - this.length);
                 ctx.stroke();
-                break;
-        }
-        
-        ctx.restore();
-    }
-    
-    drawWithColor(ctx, color) {
-        ctx.save();
-        ctx.globalAlpha = this.opacity;
-        
-        switch (this.type) {
-            case 'thunder':
-                // Draw heavy rain drops with custom color
-                ctx.strokeStyle = color;
-                ctx.lineWidth = this.size;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(this.x, this.y);
-                ctx.lineTo(this.x - this.vx * 0.5, this.y - this.length);
-                ctx.stroke();
-                break;
-                
-            case 'foggy':
-                // Draw ash particles with custom color
-                ctx.fillStyle = color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-                
-            case 'rain':
-                // Draw rain drop with custom color
-                ctx.strokeStyle = color;
-                ctx.lineWidth = this.size;
-                ctx.lineCap = 'round';
-                ctx.beginPath();
-                ctx.moveTo(this.x, this.y);
-                ctx.lineTo(this.x - this.vx * 0.5, this.y - this.length);
-                ctx.stroke();
-                break;
-                
-            case 'snow':
-            case 'windy':
-                // Draw snowflake with custom color
-                ctx.fillStyle = color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
                 break;
         }
         
@@ -401,7 +353,7 @@ export class WeatherRenderer {
             
             if (particleColor) {
                 // Override particle color to black during lightning
-                particle.drawWithColor(ctx, particleColor);
+                particle.draw(ctx, particleColor);
             } else {
                 particle.draw(ctx);
             }
@@ -543,10 +495,28 @@ export class WeatherRenderer {
     }
     
     triggerThunder() {
-        // This will be connected to audio manager
-        if (this.onThunder) {
-            this.onThunder();
-        }
+        // Calculate position-based audio parameters
+        const centerX = this.canvasWidth / 2;
+        const lightningX = this.lightning.x;
+        const distanceFromCenter = Math.abs(lightningX - centerX) / centerX; // 0 = center, 1 = edge
+        
+        // Calculate panning: -1 (left) to 1 (right)
+        const pan = (lightningX - centerX) / centerX;
+        
+        // Calculate time delay based on distance (closer = shorter delay)
+        const baseDelay = 500; // Base 500ms delay
+        const distanceDelay = distanceFromCenter * 300; // Up to 300ms additional delay
+        const totalDelay = baseDelay + distanceDelay;
+        
+        // Delay thunder sound with position-based timing
+        setTimeout(() => {
+            if (this.onThunder) {
+                this.onThunder({
+                    pan: pan,
+                    distance: distanceFromCenter
+                });
+            }
+        }, totalDelay);
     }
     
     drawSun(ctx) {
