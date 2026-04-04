@@ -19,22 +19,6 @@
             width: 100%;
             height: 100%;
         }
-        /* Responsive snowflake count based on viewport size */
-        @media (min-width: 768px) {
-            #snowflakes-canvas {
-                --snowflake-count: 200;
-            }
-        }
-        @media (min-width: 1024px) {
-            #snowflakes-canvas {
-                --snowflake-count: 300;
-            }
-        }
-        @media (min-width: 1920px) {
-            #snowflakes-canvas {
-                --snowflake-count: 500;
-            }
-        }
     </style>
 </head>
 <body>
@@ -51,8 +35,8 @@
             
             // Handle high-DPI displays - set actual pixel dimensions without scaling context
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            canvas.style.width = canvas.clientWidth + 'px';
-            canvas.style.height = canvas.clientHeight + 'px';
+            canvas.width = Math.floor(canvas.width * dpr);
+            canvas.height = Math.floor(canvas.height * dpr);
         }
 
         // Get snowflake count from CSS variable or localStorage fallback
