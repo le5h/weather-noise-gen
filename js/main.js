@@ -1,254 +1,190 @@
-const canvas = document.getElementById('snowflakes');
-const ctx = canvas.getContext('2d');
+/**
+ * Main Weather Simulation Application
+ * Coordinates all weather effects and user interactions
+ */
 
-let width, height;
-let flakes = [];
-let mode = 'heavy'; // normal, heavy, windy, rain
+import { WeatherRenderer } from './weatherRenderer.js';
+import { AudioManager } from './audioManager.js';
 
-// Background colors for each mode
-const backgroundColors = {
-    'normal': '#87CEEB',      // Sunny blue sky
-    'heavy': '#000000',       // Dark winter night
-    'windy': '#4A90E2',       // Stormy gray-blue
-    'rain': '#1a365d'         // Rainy dark blue
-};
-
-function resize() {
-    width = window.innerWidth;
-    height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
-}
-
-class Flake {
-    constructor(isRain = false) {
-        this.isRain = isRain;
+class WeatherApp {
+    constructor() {
+        this.canvas = document.getElementById('weatherCanvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.weatherDisplay = document.getElementById('weatherDisplay');
+        this.weatherButtons = document.querySelectorAll('.weather-btn');
+        this.weatherApp = document.querySelector('.weather-app');
+        this.startScreen = document.getElementById('startScreen');
+        this.startBtn = document.getElementById('startBtn');
+        this.weatherInfo = document.querySelector('.weather-info');
+        this.weatherControls = document.querySelector('.weather-controls');
         
-        if (isRain) {
-            // Rain properties
-            this.x = Math.random() * width;
-            this.y = Math.random() * -height;
-            this.vx = (Math.random() - 0.5) * 2;
-            this.vy = Math.random() * 15 + 15;
-            this.size = Math.random() * 3 + 1;
-        } else {
-            // Snow properties
-            this.x = Math.random() * width;
-            this.y = Math.random() * -height;
-            this.vx = (Math.random() - 0.5) * 2;
-            this.vy = mode === 'heavy' ? Math.random() * 8 + 6 : Math.random() * 3 + 1;
-            this.size = mode === 'heavy' ? Math.random() * 6 + 3 : Math.random() * 4 + 1;
-        }
+        this.currentWeather = 'snow';
+        this.renderer = new WeatherRenderer(this.canvas);
+        this.audioManager = new AudioManager();
+        this.isStarted = false;
         
-        // Add some randomness to rotation and sway
-        this.swaySpeed = (Math.random() - 0.5) * 0.2;
-        this.swayAngle = Math.random() * Math.PI * 2;
-    }
-
-    update() {
-        if (mode === 'windy') {
-            // Wind mode: stronger horizontal movement, faster fall
-            this.x += this.vx + (Math.random() - 0.5) * 4;
-            this.y += this.vy + 2;
-            
-            // Add sway effect
-            this.swayAngle += this.swaySpeed;
-        } else if (mode === 'rain') {
-            // Rain mode: straight down with slight horizontal drift, very fast
-            this.x += this.vx;
-            this.y += this.vy + 3;
-            
-            // Add some wobble to rain drops
-            this.swayAngle += this.swaySpeed * 2;
-        } else {
-            // Normal and Heavy modes
-            this.x += this.vx;
-            this.y += this.vy;
-            
-            // Add sway effect for normal snow
-            if (mode === 'normal') {
-                this.swayAngle += this.swaySpeed;
-                this.x += Math.sin(this.swayAngle) * 0.5;
-            } else {
-                // Heavy snow: more chaotic movement
-                this.swayAngle += this.swaySpeed * 1.5;
-                this.x += Math.sin(this.swayAngle) * 2;
+        this.weatherConfig = {
+            sunny: {
+                name: 'Sunny',
+                particles: 50,
+                background: 'sunny'
+            },
+            snow: {
+                name: 'Heavy Snow',
+                particles: 200,
+                background: 'snow'
+            },
+            windy: {
+                name: 'Windy Storm',
+                particles: 150,
+                background: 'windy'
+            },
+            rain: {
+                name: 'Rain',
+                particles: 300,
+                background: 'rain'
+            },
+            thunder: {
+                name: 'Thunderstorm',
+                particles: 250,
+                background: 'thunder'
+            },
+            foggy: {
+                name: 'Foggy Ash',
+                particles: 180,
+                background: 'foggy'
             }
-        }
-
-        // Reset when out of bounds
-        if (this.y > height + 100) {
-            this.y = -Math.random() * 300 - 50;
-            
-            if (!this.isRain) {
-                this.size = mode === 'heavy' ? Math.random() * 6 + 3 : Math.random() * 4 + 1;
-            } else {
-                // Rain stays consistent size
-                this.size = Math.random() * 3 + 1;
-            }
-        }
-
-        return true;
-    }
-
-    draw() {
-        ctx.beginPath();
-        
-        if (this.isRain) {
-            // Draw rain as lines
-            const length = this.vy / 20;
-            ctx.strokeStyle = `rgba(255, 255, 255, ${Math.random() * 0.8 + 0.3})`;
-            ctx.lineWidth = Math.max(1, this.size);
-            ctx.moveTo(this.x, this.y);
-            ctx.lineTo(this.x, this.y + length);
-            ctx.stroke();
-        } else {
-            // Draw snowflakes as circles with glow effect
-            const gradient = ctx.createRadialGradient(
-                this.x, this.y, 0,
-                this.x, this.y, this.size / 2
-            );
-            
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.7)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-}
-
-function init(count = 100) {
-    resize();
-    flakes = [];
-    
-    // Adjust count based on mode
-    const counts = { 'normal': 50, 'heavy': 200, 'windy': 150, 'rain': 300 };
-    const actualCount = counts[mode] || 100;
-    
-    for (let i = 0; i < actualCount; i++) {
-        flakes.push(new Flake(mode === 'rain'));
-    }
-}
-
-function animate() {
-    // Create trail effect by drawing semi-transparent rectangle instead of clearing completely
-    ctx.fillStyle = mode === 'rain' ? 'rgba(26, 54, 93, 0.1)' : 'rgba(0, 0, 0, 0.3)';
-    ctx.fillRect(0, 0, width, height);
-    
-    // Draw flakes
-    for (const flake of flakes) {
-        flake.update();
-        flake.draw();
-    }
-
-    requestAnimationFrame(animate);
-}
-
-// Generate wind noise using Web Audio API
-function initWindAudio() {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // Create a buffer for wind noise
-    const bufferSize = audioContext.sampleRate * 5; // 5 seconds of noise
-    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-    const data = buffer.getChannelData(0);
-    
-    for (let i = 0; i < bufferSize; i++) {
-        // Generate white noise with some filtering to simulate wind
-        let sample = Math.random() * 2 - 1;
-        
-        // Low-pass filter to make it sound like wind (not pure white noise)
-        data[i] = (data[i - 1] + sample * 0.5) * 0.9;
-    }
-    
-    const bufferSource = audioContext.createBufferSource();
-    bufferSource.buffer = buffer;
-    bufferSource.loop = true;
-    bufferSource.connect(audioContext.destination);
-}
-
-// Generate rain noise using Web Audio API
-function initRainAudio() {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    
-    // Create a buffer for rain noise
-    const bufferSize = audioContext.sampleRate * 5; // 5 seconds of noise
-    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-    const data = buffer.getChannelData(0);
-    
-    for (let i = 0; i < bufferSize; i++) {
-        // Generate rain-like noise with multiple frequencies
-        let sample = Math.random() * 2 - 1;
-        
-        // Add some frequency variation to simulate different sized drops
-        data[i] = (data[i - 1] + sample * 0.3) * 0.95;
-    }
-    
-    const bufferSource = audioContext.createBufferSource();
-    bufferSource.buffer = buffer;
-    bufferSource.loop = true;
-    bufferSource.connect(audioContext.destination);
-}
-
-// Control buttons functionality
-const controlBtns = document.querySelectorAll('.control-btn');
-
-controlBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        mode = btn.dataset.mode;
-        
-        // Update active state
-        controlBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        // Update weather display text
-        const weatherNames = {
-            'normal': 'Sunny',
-            'heavy': 'Heavy Snow',
-            'windy': 'Windy Storm',
-            'rain': 'Rain'
         };
-        document.getElementById('weather-display').textContent = weatherNames[mode];
         
-        // Change background color
-        document.body.style.backgroundColor = backgroundColors[mode];
+        this.init();
+    }
+    
+    init() {
+        this.setupCanvas();
+        this.setupEventListeners();
         
-        // Stop previous audio and start new one if needed
-        const windAudio = document.getElementById('wind-audio');
-        const rainAudio = document.getElementById('rain-audio');
+        // Show beautiful start screen immediately
+        this.showStartScreen();
+    }
+    
+    showStartScreen() {
+        this.startScreen.style.display = 'flex';
+        this.weatherInfo.style.display = 'none';
+        this.weatherControls.style.display = 'none';
+    }
+    
+    startExperience() {
+        this.isStarted = true;
         
-        function playAudio(audioElement, shouldPlay) {
-            if (shouldPlay && !audioElement.paused) return;
+        // Hide start screen with fade effect
+        this.startScreen.style.opacity = '0';
+        this.startScreen.style.transition = 'opacity 0.5s ease-out';
+        
+        setTimeout(() => {
+            this.startScreen.style.display = 'none';
+            this.weatherInfo.style.display = 'block';
+            this.weatherControls.style.display = 'flex';
             
-            if (shouldPlay) {
-                audioElement.play().catch(e => console.log('Audio play failed:', e));
-            } else {
-                audioElement.pause();
-            }
+            // Initialize audio and start weather
+            this.audioManager.init();
+            
+            // Set weather and ensure UI is properly updated
+            this.setWeather(this.currentWeather);
+            
+            // Force UI update to show active state
+            this.updateUI(this.currentWeather);
+            
+            // Update background
+            this.weatherApp.dataset.weather = this.weatherConfig[this.currentWeather].background;
+            
+            this.startAnimation();
+        }, 500);
+    }
+    
+    setupCanvas() {
+        const resize = () => {
+            this.canvas.width = window.innerWidth;
+            this.canvas.height = window.innerHeight;
+            this.renderer.resize(this.canvas.width, this.canvas.height);
+        };
+        
+        resize();
+        window.addEventListener('resize', resize);
+    }
+    
+    setupEventListeners() {
+        // Start button click
+        this.startBtn.addEventListener('click', () => {
+            this.startExperience();
+        });
+        
+        // Weather button clicks
+        this.weatherButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                if (!this.isStarted) return;
+                
+                const weather = button.dataset.weather;
+                this.setWeather(weather);
+            });
+        });
+    }
+    
+    setWeather(weather) {
+        if (!this.weatherConfig[weather]) {
+            return;
         }
         
-        playAudio(windAudio, mode === 'windy');
-        playAudio(rainAudio, mode === 'rain');
+        this.currentWeather = weather;
+        const config = this.weatherConfig[weather];
         
-        // Reset flakes when changing modes
-        init();
-    });
+        // Always update UI (even for same weather, needed for initial load)
+        this.updateUI(weather);
+        
+        // Update background
+        this.weatherApp.dataset.weather = config.background;
+        
+        // Update weather renderer
+        this.renderer.setWeather(weather, config.particles);
+        
+        // Update audio
+        this.audioManager.setWeather(weather);
+        
+        // Connect thunder sound to lightning for thunder weather
+        if (weather === 'thunder') {
+            this.renderer.onThunder = () => {
+                if (this.audioManager.generateThunder) {
+                    this.audioManager.generateThunder();
+                }
+            };
+        } else {
+            this.renderer.onThunder = null;
+        }
+    }
+    
+    updateUI(weather) {
+        // Update button states
+        this.weatherButtons.forEach(button => {
+            button.classList.toggle('active', button.dataset.weather === weather);
+        });
+        
+        // Update weather display
+        this.weatherDisplay.textContent = this.weatherConfig[weather].name;
+    }
+    
+    startAnimation() {
+        const animate = () => {
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            this.renderer.update();
+            this.renderer.draw(this.ctx);
+            requestAnimationFrame(animate);
+        };
+        
+        animate();
+    }
+}
+
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new WeatherApp();
 });
 
-window.addEventListener('resize', () => {
-    resize();
-});
-
-// Initialize and start animation
-init();
-animate();
-
-// Initialize audio on first user interaction (browser policy)
-document.body.addEventListener('click', function() {
-    if (mode === 'windy') initWindAudio();
-    else if (mode === 'rain') initRainAudio();
-}, { once: true });

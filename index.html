@@ -3,25 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Falling Snowflakes - Enhanced</title>
+    <title>Weather Simulation</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <canvas id="snowflakes"></canvas>
-    
-    <div class="info">Weather: <span id="weather-display" style="color: #fff;">Heavy Snow</span></div>
-    
-    <div class="controls">
-        <button class="control-btn" data-mode="normal" title="Normal Mode">☀️ Sunny</button>
-        <button class="control-btn active" data-mode="heavy" title="Heavy Snow">❄️ Heavy Snow</button>
-        <button class="control-btn" data-mode="windy" title="Windy">💨 Windy</button>
-        <button class="control-btn" data-mode="rain" title="Rain">🌧️ Rain</button>
-    </div>
+    <main class="weather-app">
+        <canvas id="weatherCanvas"></canvas>
+        
+        <!-- Start Screen -->
+        <div id="startScreen" class="start-screen">
+            <div class="start-content">
+                <h1 class="start-title">Weather Simulation</h1>
+                <p class="start-subtitle">Experience interactive weather effects</p>
+                <button id="startBtn" class="start-btn">Start Experience</button>
+            </div>
+        </div>
+        
+        <header class="weather-info" style="display: none;">
+            <h1 class="app-title">Weather Simulation</h1>
+            <div class="weather-status">
+                Current: <span id="weatherDisplay">Heavy Snow</span>
+            </div>
+        </header>
+
+        <nav class="weather-controls" style="display: none;">
+            <button class="weather-btn" data-weather="sunny" aria-label="Sunny weather">
+                <span class="weather-icon">☀️</span>
+                <span class="weather-label">Sunny</span>
+            </button>
+            <button class="weather-btn active" data-weather="snow" aria-label="Snow weather">
+                <span class="weather-icon">❄️</span>
+                <span class="weather-label">Snow</span>
+            </button>
+            <button class="weather-btn" data-weather="windy" aria-label="Windy weather">
+                <span class="weather-icon">💨</span>
+                <span class="weather-label">Windy</span>
+            </button>
+            <button class="weather-btn" data-weather="rain" aria-label="Rain weather">
+                <span class="weather-icon">🌧️</span>
+                <span class="weather-label">Rain</span>
+            </button>
+            <button class="weather-btn" data-weather="thunder" aria-label="Thunder weather">
+                <span class="weather-icon">⛈️</span>
+                <span class="weather-label">Thunder</span>
+            </button>
+            <button class="weather-btn" data-weather="foggy" aria-label="Foggy weather">
+                <span class="weather-icon">🌫️</span>
+                <span class="weather-label">Foggy</span>
+            </button>
+        </nav>
+    </main>
 
     <!-- Audio elements for wind and rain noise -->
     <audio id="wind-audio" loop></audio>
     <audio id="rain-audio" loop></audio>
 
-    <script src="js/main.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
