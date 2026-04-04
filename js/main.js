@@ -172,14 +172,20 @@ class WeatherApp {
     }
     
     startAnimation() {
-        const animate = () => {
+        let lastTime = 0;
+        
+        const animate = (currentTime) => {
+            // Calculate delta time in seconds
+            const deltaTime = lastTime ? (currentTime - lastTime) / 1000 : 0;
+            lastTime = currentTime;
+            
             this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-            this.renderer.update();
+            this.renderer.update(deltaTime);
             this.renderer.draw(this.ctx);
             requestAnimationFrame(animate);
         };
         
-        animate();
+        requestAnimationFrame(animate);
     }
 }
 

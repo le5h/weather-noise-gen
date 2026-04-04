@@ -67,6 +67,7 @@ export class AudioManager {
         switch (weather) {
             case 'sunny':
                 this.startRiverSound();
+                this.startSunHumSound();
                 break;
             case 'snow':
                 this.startWindHowlSound();
@@ -263,6 +264,42 @@ export class AudioManager {
                 this.sirenEchoGain.disconnect();
             } catch (e) {}
             this.sirenEchoGain = null;
+        }
+        
+        // Cleanup sun oscillators and components
+        if (this.sunOscillators) {
+            this.sunOscillators.forEach(({ osc, gain }) => {
+                try {
+                    osc.stop();
+                    osc.disconnect();
+                } catch (e) {}
+                try {
+                    gain.disconnect();
+                } catch (e) {}
+            });
+            this.sunOscillators = null;
+        }
+        
+        if (this.sunLfo) {
+            try {
+                this.sunLfo.stop();
+                this.sunLfo.disconnect();
+            } catch (e) {}
+            this.sunLfo = null;
+        }
+        
+        if (this.sunFilter) {
+            try {
+                this.sunFilter.disconnect();
+            } catch (e) {}
+            this.sunFilter = null;
+        }
+        
+        if (this.sunGain) {
+            try {
+                this.sunGain.disconnect();
+            } catch (e) {}
+            this.sunGain = null;
         }
     }
     
@@ -701,6 +738,162 @@ export class AudioManager {
         
         thunderSource.start();
         thunderSource.stop(this.audioContext.currentTime + duration);
+    }
+    
+    startSunHumSound() {
+        if (!this.audioContext) return;
+        
+        console.log('Starting sun humming sound');
+        
+        // Sun humming configuration - G, A, B, D notes across multiple octaves
+        const sunNotes = [
+            // Lower octaves for more bass
+            { frequency: 98.00, name: 'G2' },   // G in 2nd octave
+            { frequency: 110.00, name: 'A2' },  // A in 2nd octave
+            { frequency: 123.47, name: 'B2' },  // B in 2nd octave
+            { frequency: 146.83, name: 'D3' },  // D in 3rd octave
+            
+            // Middle octaves
+            { frequency: 196.00, name: 'G3' },  // G in 3rd octave
+            { frequency: 220.00, name: 'A3' },  // A in 3rd octave  
+            { frequency: 246.94, name: 'B3' },  // B in 3rd octave
+            { frequency: 293.66, name: 'D4' },  // D in 4th octave
+            
+            // Higher octaves (original)
+            { frequency: 392.00, name: 'G4' },  // G in 4th octave
+            { frequency: 440.00, name: 'A4' },  // A in 4th octave  
+            { frequency: 493.88, name: 'B4' },  // B in 4th octave
+            { frequency: 587.33, name: 'D5' }   // D in 5th octave
+        ];
+        
+        // Create gain for overall sun hum volume
+        this.sunGain = this.audioContext.createGain();
+        this.sunGain.gain.value = 0.20; // Increased from 0.12 to 0.20
+        
+        // Create low-pass filter for warmth
+        this.sunFilter = this.audioContext.createBiquadFilter();
+        this.sunFilter.type = 'lowpass';
+        this.sunFilter.frequency.value = 150; // Lower cutoff for more bass
+        this.sunFilter.Q.value = 0.8;
+        
+        // Create subtle LFO for gentle variation
+        this.sunLfo = this.audioContext.createOscillator();
+        this.sunLfo.frequency.value = 0.08; // Even slower variation
+        this.sunLfo.type = 'sine';
+        
+        const lfoGain = this.audioContext.createGain();
+        lfoGain.gain.value = 0.03; // Very subtle modulation
+        
+        // Store oscillators and their trigger times for random triggering
+        this.sunOscillators = [];
+        this.sunNoteTriggers = [];
+        
+        sunNotes.forEach((note, index) => {
+            const osc = this.audioContext.createOscillator();
+            const oscGain = this.audioContext.createGain();
+            const noteGain = this.audioContext.createGain(); // For ADSR
+            
+            osc.type = 'sine'; // Pure sine waves for clean hum
+            osc.frequency.value = note.frequency;
+            
+            // Set individual note gain based on octave (lower octaves quieter)
+            const octaveMultiplier = index < 4 ? 0.3 : (index < 8 ? 0.5 : 0.7);
+            noteGain.gain.value = 0; // Start silent, will be triggered by ADSR
+            
+            oscGain.gain.value = 0.2 * octaveMultiplier; // Base gain per note
+            
+            // Connect with LFO modulation for gentle variation
+            this.sunLfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            
+            // Route through ADSR gain, then filter and main gain
+            osc.connect(noteGain);
+            noteGain.connect(oscGain);
+            oscGain.connect(this.sunFilter);
+            
+            // Store for triggering
+            this.sunOscillators.push({ 
+                osc, 
+                gain: oscGain, 
+                noteGain: noteGain, 
+                note: note.name,
+                frequency: note.frequency 
+            });
+            
+            // Start oscillator
+            osc.start();
+        });
+        
+        // Connect filter to main gain
+        this.sunFilter.connect(this.sunGain);
+        this.sunGain.connect(this.audioContext.destination);
+        
+        // Start LFO
+        this.sunLfo.start();
+        
+        // Start random note triggering with ADSR envelopes
+        this.startSunNoteTriggers();
+        
+        console.log('Sun humming sound started successfully');
+    }
+    
+    startSunNoteTriggers() {
+        const triggerRandomNote = () => {
+            if (!this.sunOscillators || this.currentWeather !== 'sunny') return;
+            
+            // Select random note, preferring middle octaves
+            const weights = [0.05, 0.05, 0.05, 0.05, 0.15, 0.15, 0.15, 0.15, 0.1, 0.1, 0.1, 0.1];
+            const randomIndex = this.weightedRandom(weights);
+            const selectedNote = this.sunOscillators[randomIndex];
+            
+            // Apply ADSR envelope
+            this.applySunADSR(selectedNote);
+            
+            // Schedule next trigger
+            const nextTriggerTime = 0.5 + Math.random() * 2; // 0.5-2.5 seconds
+            setTimeout(triggerRandomNote, nextTriggerTime * 1000);
+        };
+        
+        // Start triggering notes
+        setTimeout(triggerRandomNote, 100); // Start after 100ms
+    }
+    
+    applySunADSR(noteOsc) {
+        const currentTime = this.audioContext.currentTime;
+        const noteGain = noteOsc.noteGain;
+        
+        // ADSR parameters for smooth, gentle humming
+        const attack = 0.8;    // Slow attack for gentle fade-in
+        const decay = 1.5;     // Medium decay
+        const sustain = 0.3;   // Low sustain level
+        const release = 2.0;  // Long release for smooth fade-out
+        
+        // Calculate target gain based on octave
+        const baseGain = noteOsc.frequency < 200 ? 0.4 : (noteOsc.frequency < 400 ? 0.6 : 0.8);
+        const targetGain = baseGain * 0.5;
+        
+        // Attack - fade in
+        noteGain.gain.cancelScheduledValues(currentTime);
+        noteGain.gain.setValueAtTime(0, currentTime);
+        noteGain.gain.linearRampToValueAtTime(targetGain, currentTime + attack);
+        
+        // Decay - drop to sustain level
+        noteGain.gain.linearRampToValueAtTime(targetGain * sustain, currentTime + attack + decay);
+        
+        // Release - fade out after sustain period
+        const sustainDuration = 1 + Math.random() * 3; // 1-4 seconds sustain
+        noteGain.gain.linearRampToValueAtTime(0, currentTime + attack + decay + sustainDuration + release);
+    }
+    
+    weightedRandom(weights) {
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+        let random = Math.random() * totalWeight;
+        
+        for (let i = 0; i < weights.length; i++) {
+            random -= weights[i];
+            if (random <= 0) return i;
+        }
+        return weights.length - 1;
     }
     
     startSirenSound() {
