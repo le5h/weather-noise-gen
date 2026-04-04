@@ -300,23 +300,24 @@ export class AudioManager {
         
         console.log('Starting rain sound');
         
-        // Create rain sound using high-frequency noise
-        const bufferSize = this.audioContext.sampleRate * 1;
+        // Create rain sound using bandpass-filtered noise (copied from thunder)
+        const bufferSize = this.audioContext.sampleRate * 2;
         const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
         const data = buffer.getChannelData(0);
         
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.05;
+            data[i] = (Math.random() * 2 - 1) * 0.06;
         }
         
         this.rainNoise = this.audioContext.createBufferSource();
         this.rainNoise.buffer = buffer;
         this.rainNoise.loop = true;
         
-        // Apply high-pass filter for rain effect
+        // Apply bandpass filter for natural outdoor rain effect
         const filter = this.audioContext.createBiquadFilter();
-        filter.type = 'highpass';
-        filter.frequency.value = 2000;
+        filter.type = 'bandpass';
+        filter.frequency.value = 1500;
+        filter.Q.value = 0.8;
         
         this.rainGain = this.audioContext.createGain();
         this.rainGain.gain.value = 0.15; // Increased volume
@@ -335,14 +336,14 @@ export class AudioManager {
     startRiverSound() {
         if (!this.audioContext) return;
         
-        console.log('Starting river sound');
+        console.log('Starting grass+wind sound');
         
-        // Create multiple noise sources for realistic water flow
+        // Create grass+wind sound with volume bursts
         this.riverNoiseSources = [];
         this.riverGain = this.audioContext.createGain();
-        this.riverGain.gain.value = 0.15;
+        this.riverGain.gain.value = 0.2;
         
-        // Create 3 different water noise layers
+        // Create 3 different wind/grass layers
         for (let i = 0; i < 3; i++) {
             const bufferSize = this.audioContext.sampleRate * 4;
             const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
@@ -350,7 +351,7 @@ export class AudioManager {
             
             // Generate different characteristics for each layer
             for (let j = 0; j < bufferSize; j++) {
-                const amplitude = i === 0 ? 0.03 : i === 1 ? 0.02 : 0.01;
+                const amplitude = i === 0 ? 0.04 : i === 1 ? 0.03 : 0.02;
                 data[j] = (Math.random() * 2 - 1) * amplitude;
             }
             
@@ -358,51 +359,67 @@ export class AudioManager {
             noiseSource.buffer = buffer;
             noiseSource.loop = true;
             
-            // Create different filters for each layer
+            // Create filters for grass+wind effect (V-shaped EQ with reduced highs)
             const filter = this.audioContext.createBiquadFilter();
             if (i === 0) {
-                // Low frequency rumble - deep water
+                // Low frequency wind rumble
                 filter.type = 'lowpass';
                 filter.frequency.value = 200;
-                filter.Q.value = 0.5;
+                filter.Q.value = 0.6;
             } else if (i === 1) {
-                // Mid frequency flow - medium water
+                // Mid frequency grass rustle (boosted for V-shape)
                 filter.type = 'bandpass';
-                filter.frequency.value = 800;
-                filter.Q.value = 2;
+                filter.frequency.value = 1500;
+                filter.Q.value = 2.5;
             } else {
-                // High frequency babble - small rapids
+                // High frequency wind hiss (reduced for V-shape)
                 filter.type = 'highpass';
-                filter.frequency.value = 2000;
-                filter.Q.value = 1;
+                filter.frequency.value = 2500;
+                filter.Q.value = 0.3;
             }
             
-            // Add subtle modulation for natural variation
+            // Create volume burst modulation (like wind gusts)
             const lfo = this.audioContext.createOscillator();
-            lfo.frequency.value = 0.1 + i * 0.05;
+            lfo.frequency.value = 0.1 + i * 0.08; // Different rates for each layer
             const lfoGain = this.audioContext.createGain();
-            lfoGain.gain.value = i === 0 ? 50 : i === 1 ? 100 : 200;
+            lfoGain.gain.value = i === 0 ? 0.6 : i === 1 ? 0.8 : 1.0; // Stronger modulation for higher frequencies
             
             lfo.connect(lfoGain);
             lfoGain.connect(filter.frequency);
             
-            // Connect audio graph
-            noiseSource.connect(filter);
-            filter.connect(this.riverGain);
+            // Create additional amplitude modulation for wind bursts with volume limiting
+            const burstLfo = this.audioContext.createOscillator();
+            burstLfo.frequency.value = 0.05 + i * 0.03;
+            const burstGain = this.audioContext.createGain();
+            burstGain.gain.value = 0.175; // Modulation range: ±17.5% around 25% base (10-50%)
             
-            // Start the noise and LFO
+            // Create volume limiter to prevent complete silence and cap at 50%
+            const limiterGain = this.audioContext.createGain();
+            limiterGain.gain.value = 0.25; // Base volume 25%
+            
+            burstLfo.connect(burstGain);
+            burstGain.connect(limiterGain.gain); // Modulate the limiter gain
+            
+            // Connect audio graph with amplitude modulation through limiter
+            noiseSource.connect(filter);
+            filter.connect(limiterGain);
+            limiterGain.connect(this.riverGain);
+            
+            // Start the noise and LFOs
             noiseSource.start();
             lfo.start();
+            burstLfo.start();
             
             this.riverNoiseSources.push({
                 noise: noiseSource,
-                lfo: lfo
+                lfo: lfo,
+                burstLfo: burstLfo
             });
         }
         
         this.riverGain.connect(this.audioContext.destination);
         
-        console.log('River sound started successfully');
+        console.log('Grass+wind sound started successfully');
     }
     
     startWindHowlSound() {
@@ -464,30 +481,38 @@ export class AudioManager {
         
         console.log('Starting thunder sound');
         
-        // Create continuous rain sound for thunderstorm
+        // Create thicker rain sound for thunderstorm using multiple layers
         const bufferSize = this.audioContext.sampleRate * 2;
         const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
         const data = buffer.getChannelData(0);
         
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * 0.06;
+            data[i] = (Math.random() * 2 - 1) * 0.08;
         }
         
         this.thunderRainNoise = this.audioContext.createBufferSource();
         this.thunderRainNoise.buffer = buffer;
         this.thunderRainNoise.loop = true;
         
-        const rainFilter = this.audioContext.createBiquadFilter();
-        rainFilter.type = 'highpass';
-        rainFilter.frequency.value = 3000;
-        rainFilter.Q.value = 1;
+        // Create dual-filter system for thicker sound
+        const lowFilter = this.audioContext.createBiquadFilter();
+        lowFilter.type = 'lowpass';
+        lowFilter.frequency.value = 1200;
+        lowFilter.Q.value = 1.5;
+        
+        const midFilter = this.audioContext.createBiquadFilter();
+        midFilter.type = 'bandpass';
+        midFilter.frequency.value = 800;
+        midFilter.Q.value = 2;
         
         this.thunderRainGain = this.audioContext.createGain();
-        this.thunderRainGain.gain.value = 0.08;
+        this.thunderRainGain.gain.value = 0.12;
         
-        // Connect rain sound
-        this.thunderRainNoise.connect(rainFilter);
-        rainFilter.connect(this.thunderRainGain);
+        // Connect rain sound through both filters for thicker texture
+        this.thunderRainNoise.connect(lowFilter);
+        this.thunderRainNoise.connect(midFilter);
+        lowFilter.connect(this.thunderRainGain);
+        midFilter.connect(this.thunderRainGain);
         this.thunderRainGain.connect(this.audioContext.destination);
         
         // Start rain sound
@@ -672,13 +697,13 @@ export class AudioManager {
             return { osc, panner, gain };
         });
         
-        // Start all oscillators
-        this.sirenOscillators.forEach(({ osc }) => osc.start());
-        
-        // Create LFO for siren effect - use sine with manual phase offset
+        // Create LFO for siren effect - use timing delay for phase offset
         this.sirenLFO = this.audioContext.createOscillator();
         this.sirenLFO.frequency.value = sirenConfig.frequency.sweepRate;
         this.sirenLFO.type = 'sine';
+        
+        // Start LFO immediately so it's running when oscillators start
+        this.sirenLFO.start();
         
         // Create gain for LFO to control frequency modulation
         const lfoGain = this.audioContext.createGain();
@@ -688,21 +713,8 @@ export class AudioManager {
         const offsetGain = this.audioContext.createGain();
         offsetGain.gain.value = (sirenConfig.frequency.min + sirenConfig.frequency.max) / 2; // Center frequency
         
-        // Create inverter to flip sine to start from bottom
-        const inverterGain = this.audioContext.createGain();
-        inverterGain.gain.value = -1;
-        
-        // Create DC offset to shift inverted sine to start at bottom
-        const dcOffsetGain = this.audioContext.createGain();
-        dcOffsetGain.gain.value = -(sirenConfig.frequency.max - sirenConfig.frequency.min) / 2; // Subtract half range to start at bottom
-        
-        // Connect LFO through inverter and DC offset
-        this.sirenLFO.connect(inverterGain);
-        inverterGain.connect(lfoGain);
-        dcOffsetGain.connect(lfoGain);
-        
-        // Start the LFO
-        this.sirenLFO.start();
+        // Connect LFO before starting oscillators
+        this.sirenLFO.connect(lfoGain);
         
         // Connect modulation and offset to all oscillators
         this.sirenOscillators.forEach(({ osc }) => {
@@ -710,8 +722,17 @@ export class AudioManager {
             offsetGain.connect(osc.frequency);
         });
         
-        // Create main gain control
-        this.sirenGain.gain.value = sirenConfig.gain.main;
+        // Create main gain control with volume hack for phase
+        this.sirenGain.gain.setValueAtTime(0, this.audioContext.currentTime); // Start silent
+        
+        // Start all oscillators immediately (no phase delay)
+        this.sirenOscillators.forEach(({ osc }) => {
+            osc.start();
+        });
+        
+        // Wait for LFO to reach bottom point (3/4 period), then restore volume
+        const restoreTime = this.audioContext.currentTime + (3 / (sirenConfig.frequency.sweepRate * 4)); // 3/4 period to reach bottom
+        this.sirenGain.gain.linearRampToValueAtTime(sirenConfig.gain.main, restoreTime + 0.1); // Restore volume
         
         // Create echo/delay effect
         this.sirenDelay = this.audioContext.createDelay(sirenConfig.delay.maxDelay);
