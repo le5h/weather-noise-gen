@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Falling Snowflakes - Optimized</title>
+    <title>Falling Snowflakes - Debug</title>
     <style>
         body {
             margin: 0;
@@ -11,9 +11,6 @@
             background-color: #000;
             height: 100vh;
             width: 100vw;
-            display: flex;
-            justify-content: center;
-            align-items: center;
         }
         canvas {
             position: absolute;
@@ -22,22 +19,6 @@
             width: 100%;
             height: 100%;
         }
-        /* Responsive snowflake count based on viewport size */
-        @media (min-width: 768px) {
-            #snowflakes-canvas {
-                --snowflake-count: 200;
-            }
-        }
-        @media (min-width: 1024px) {
-            #snowflakes-canvas {
-                --snowflake-count: 300;
-            }
-        }
-        @media (min-width: 1920px) {
-            #snowflakes-canvas {
-                --snowflake-count: 500;
-            }
-        }
     </style>
 </head>
 <body>
@@ -45,7 +26,7 @@
 
     <script>
         const canvas = document.getElementById('snowflakes-canvas');
-        const ctx = canvas.getContext('2d', { alpha: false }); // Optimize for non-transparent backgrounds
+        const ctx = canvas.getContext('2d', { alpha: false });
 
         // Set canvas to full viewport size
         function resizeCanvas() {
@@ -54,14 +35,13 @@
             
             // Handle high-DPI displays - set actual pixel dimensions without scaling context
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            canvas.width = Math.floor(canvas.clientWidth * dpr);
-            canvas.height = Math.floor(canvas.clientHeight * dpr);
+            canvas.style.width = canvas.clientWidth + 'px';
+            canvas.style.height = canvas.clientHeight + 'px';
         }
 
-        // Get snowflake count from CSS variable or localStorage fallback
+        // Get snowflake count
         function getSnowflakeCount() {
-            const cssVar = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--snowflake-count'));
-            return cssVar ? cssVar : 100;
+            return 50;
         }
 
         // Snowflake class with lifecycle management
@@ -69,91 +49,63 @@
             constructor(x, y) {
                 this.x = x;
                 this.y = y;
-                this.size = Math.random() * 2 + 1; // size between 1-3
-                this.speedX = (Math.random() - 0.5) * 0.5; // slight horizontal drift
-                this.speedY = 1 + Math.random() * 2; // gravity
-                this.color = `hsl(${Math.floor(360*Math.random())}, ${Math.floor(80+Math.random()*40)}%, ${Math.floor(70+Math.random()*20)}%)`;
-                this.life = 1.0; // Life factor for fade effect
+                this.size = Math.random() * 3 + 1;
+                this.speedX = (Math.random() - 0.5) * 2;
+                this.speedY = Math.random() * 1 + 0.5;
             }
 
             draw() {
-                ctx.globalAlpha = this.life;
+                ctx.fillStyle = 'white';
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size/2, 0, Math.PI*2);
-                ctx.fillStyle = this.color;
+                ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.globalAlpha = 1.0; // Reset alpha for other elements
             }
 
             update() {
                 this.x += this.speedX;
                 this.y += this.speedY;
                 
-                // Bounce off bottom edge with slight speed variation
+                // Bounce off bottom edge
                 if (this.y > canvas.height) {
-                    this.y = -Math.random() * 100;
-                    this.life -= 0.005; // Gradually fade out old snowflakes
-                    this.speedY = Math.random() * 2 + 1;
-                    
-                    // Respawn if life is too low (prevents accumulation)
-                    if (this.life <= 0) {
-                        return false; // Signal to remove this snowflake
-                    }
+                    this.y = -10;
+                    this.speedY = Math.random() * 1 + 0.5;
                 }
 
                 // Keep within bounds
                 this.x = Math.max(0, Math.min(canvas.width, this.x));
                 
-                return true; // Snowflake is still active
+                return true;
             }
         }
 
         // Create initial snowflakes
         const snowflakes = [];
         function initSnowflakes(count) {
-            for (let i=0; i<count; i++) {
+            for (let i = 0; i < count; i++) {
                 const x = Math.random() * canvas.width;
-                const y = -Math.random() * 100;
+                const y = -10;
                 snowflakes.push(new Snowflake(x, y));
             }
         }
 
-        // Animation loop with optimized clearing using requestAnimationFrame
+        // Animation loop
         function animate(timestamp) {
             if (!timestamp) timestamp = performance.now();
             
-            // Use composite operation for better performance than clearRect
-            ctx.globalCompositeOperation = 'source-over';
-            
-            // Clear the canvas first (essential step that was missing!)
+            // Clear the canvas first
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Update and draw snowflakes in a single pass
-            let activeCount = 0;
-            const activeSnowflakes = [];
+            // Update and draw snowflakes
             for (const flake of snowflakes) {
                 const shouldKeep = flake.update();
                 if (shouldKeep) {
-                    activeSnowflakes.push(flake);
-                    activeCount++;
+                    flake.draw();
                 } else {
-                    // Remove dead snowflake to prevent memory buildup
                     const index = snowflakes.indexOf(flake);
                     if (index > -1) {
                         snowflakes.splice(index, 1);
                     }
                 }
-            }
-
-            // Replace active snowflakes array for O(1) operations
-            snowflakes.length = 0;
-            snowflakes.push(...activeSnowflakes);
-
-            // Add new snowflakes if we've lost too many
-            while (snowflakes.length < getSnowflakeCount() && Math.random() > 0.95) {
-                const x = Math.random() * canvas.width;
-                const y = -Math.random() * 100;
-                snowflakes.push(new Snowflake(x, y));
             }
 
             requestAnimationFrame(animate);
@@ -170,47 +122,6 @@
 
         // Handle window resizing
         window.addEventListener('resize', resizeCanvas);
-        
-        // Performance monitoring using setInterval for periodic updates
-        let lastFrameTime = performance.now();
-        function monitorPerformance() {
-            const now = performance.now();
-            const delta = now - lastFrameTime;
-            
-            if (delta >= 1000) {
-                const fps = Math.round(1000 / delta);
-                console.log(`FPS: ${fps}, Active snowflakes: ${snowflakes.length}`);
-                lastFrameTime = now;
-            }
-        }
-
-        // Start performance monitoring using setInterval for periodic updates
-        let monitorIntervalId = null;
-        function startPerformanceMonitoring() {
-            if (monitorIntervalId) {
-                clearInterval(monitorIntervalId);
-            }
-            monitorIntervalId = setInterval(() => {
-                const now = performance.now();
-                const delta = now - lastFrameTime;
-                
-                if (delta >= 1000) {
-                    const fps = Math.round(1000 / delta);
-                    console.log(`FPS: ${fps}, Active snowflakes: ${snowflakes.length}`);
-                    lastFrameTime = now;
-                }
-            }, 1000);
-        }
-
-        // Start performance monitoring
-        startPerformanceMonitoring();
-
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', () => {
-            if (monitorIntervalId) {
-                clearInterval(monitorIntervalId);
-            }
-        });
     </script>
 </body>
 </html>
