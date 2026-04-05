@@ -63,6 +63,50 @@ export class AudioManager {
         } catch (e) {}
     }
 
+    connectLFO(rate, targetParam, depth, name, type = 'sine') {
+        const lfo = this.createLFO(rate, type);
+        const lfoGain = this.createGain(depth);
+        lfo.connect(lfoGain);
+        lfoGain.connect(targetParam);
+        lfo.start();
+        this.registerParamConnection(name, lfoGain, targetParam);
+        return { lfo, lfoGain };
+    }
+
+    calculateEnvelopeValue(t, { attack, decay, sustain, release, sustainDuration = 0 }) {
+        if (t < attack) {
+            return t / attack;
+        } else if (t < attack + decay) {
+            return 1 - ((t - attack) / decay) * (1 - sustain);
+        } else if (t < attack + decay + sustainDuration) {
+            return sustain;
+        } else {
+            const releaseProgress = (t - attack - decay - sustainDuration) / release;
+            return sustain * Math.exp(-releaseProgress * 2);
+        }
+    }
+
+    scheduleADSR(gainNode, startTime, targetGain, { attack, decay, sustain, release, sustainDuration }) {
+        gainNode.gain.cancelScheduledValues(startTime);
+        gainNode.gain.setValueAtTime(0, startTime);
+        gainNode.gain.linearRampToValueAtTime(targetGain, startTime + attack);
+        gainNode.gain.linearRampToValueAtTime(targetGain * sustain, startTime + attack + decay);
+        gainNode.gain.linearRampToValueAtTime(0, startTime + attack + decay + sustainDuration + release);
+    }
+
+    createReverbBuffer(duration, decayRate = 1.2, amplitude = 0.4, channels = 2) {
+        const buffer = this.audioContext.createBuffer(channels, this.audioContext.sampleRate * duration, this.audioContext.sampleRate);
+        
+        for (let channel = 0; channel < channels; channel++) {
+            const channelData = buffer.getChannelData(channel);
+            for (let i = 0; i < channelData.length; i++) {
+                const t = i / this.audioContext.sampleRate;
+                channelData[i] = (Math.random() * 2 - 1) * Math.exp(-t * decayRate) * amplitude;
+            }
+        }
+        return buffer;
+    }
+
     // ============ NODE TRACKING SYSTEM ============
 
     registerNodes(name, nodes) {
@@ -202,14 +246,9 @@ export class AudioManager {
         const nodes = { sources: [source], filters: [filter], gains: [gain] };
 
         if (config.lfo) {
-            const lfo = this.createLFO(config.lfo.rate, config.lfo.type || 'sine');
-            const lfoGain = this.createGain(config.lfo.depth);
-            lfo.connect(lfoGain);
             const targetParam = config.lfo.target === 'filter' ? filter.frequency : gain.gain;
-            lfoGain.connect(targetParam);
-            lfo.start();
+            const { lfo, lfoGain } = this.connectLFO(config.lfo.rate, targetParam, config.lfo.depth, name, config.lfo.type || 'sine');
             nodes.lfos = [lfo, lfoGain];
-            this.registerParamConnection(name, lfoGain, targetParam);
         }
 
         if (config.secondFilter) {
@@ -253,24 +292,13 @@ export class AudioManager {
             let lastNode = filter;
 
             if (layer.lfo) {
-                const lfo = this.createLFO(layer.lfo.rate);
-                const lfoGain = this.createGain(layer.lfo.depth);
-                lfo.connect(lfoGain);
-                lfoGain.connect(filter.frequency);
-                lfo.start();
+                const { lfo, lfoGain } = this.connectLFO(layer.lfo.rate, filter.frequency, layer.lfo.depth, name);
                 allNodes.lfos.push(lfo, lfoGain);
-                this.registerParamConnection(name, lfoGain, filter.frequency);
             }
 
             if (layer.burstLfo) {
-                const burstLfo = this.createLFO(layer.burstLfo.rate);
-                const burstGain = this.createGain(layer.burstLfo.depth);
                 const layerGain = this.createGain(layer.burstLfo.baseGain || 0.4);
-
-                burstLfo.connect(burstGain);
-                burstGain.connect(layerGain.gain);
-                burstLfo.start();
-                this.registerParamConnection(name, burstGain, layerGain.gain);
+                const { lfo: burstLfo, lfoGain: burstGain } = this.connectLFO(layer.burstLfo.rate, layerGain.gain, layer.burstLfo.depth, name);
 
                 filter.connect(layerGain);
                 layerGain.connect(masterGain);
@@ -280,15 +308,9 @@ export class AudioManager {
             } else if (layer.envelope) {
                 const envelope = this.createGain(layer.envelope.base);
                 if (layer.envelope.lfo) {
-                    const lfo = this.createLFO(layer.envelope.lfo.rate);
-                    const lfoGain = this.createGain(1);
-                    lfo.connect(lfoGain);
-                    lfoGain.gain.value = layer.envelope.lfo.depth;
-                    lfoGain.connect(envelope.gain);
-                    lfo.start();
-                    allNodes.lfos.push(lfo, lfoGain);
-                    this.registerParamConnection(name, lfoGain, envelope.gain);
+                    const { lfo, lfoGain } = this.connectLFO(layer.envelope.lfo.rate, envelope.gain, layer.envelope.lfo.depth, name);
                     envelope.gain.value = layer.envelope.base;
+                    allNodes.lfos.push(lfo, lfoGain);
                 }
                 filter.connect(envelope);
 
@@ -509,17 +531,7 @@ export class AudioManager {
             convolver.buffer = reverbBuffer;
         } else {
             // Fallback: generate reverb on main thread (simplified)
-            const reverbDuration = 2; // Shorter for fallback
-            const reverbBuffer = this.audioContext.createBuffer(2, this.audioContext.sampleRate * reverbDuration, this.audioContext.sampleRate);
-            
-            for (let channel = 0; channel < 2; channel++) {
-                const channelData = reverbBuffer.getChannelData(channel);
-                for (let i = 0; i < channelData.length; i++) {
-                    const t = i / this.audioContext.sampleRate;
-                    channelData[i] = (Math.random() * 2 - 1) * Math.exp(-t * 1.2) * 0.4;
-                }
-            }
-            convolver.buffer = reverbBuffer;
+            convolver.buffer = this.createReverbBuffer(2, 1.2, 0.4, 2);
         }
         
         // Apply additional filtering for thunder character
@@ -634,30 +646,17 @@ export class AudioManager {
     }
     
     applySunADSR(noteOsc) {
-        const currentTime = this.audioContext.currentTime;
-        const noteGain = noteOsc.noteGain;
-        
-        // ADSR parameters for smooth, gentle humming
-        const attack = 0.8;    // Slow attack for gentle fade-in
-        const decay = 1.5;     // Medium decay
-        const sustain = 0.3;   // Low sustain level
-        const release = 2.0;  // Long release for smooth fade-out
-        
-        // Calculate target gain based on octave
         const baseGain = noteOsc.frequency < 200 ? 0.4 : (noteOsc.frequency < 400 ? 0.6 : 0.8);
         const targetGain = baseGain * 0.5;
+        const sustainDuration = 1 + Math.random() * 3;
         
-        // Attack - fade in
-        noteGain.gain.cancelScheduledValues(currentTime);
-        noteGain.gain.setValueAtTime(0, currentTime);
-        noteGain.gain.linearRampToValueAtTime(targetGain, currentTime + attack);
-        
-        // Decay - drop to sustain level
-        noteGain.gain.linearRampToValueAtTime(targetGain * sustain, currentTime + attack + decay);
-        
-        // Release - fade out after sustain period
-        const sustainDuration = 1 + Math.random() * 3; // 1-4 seconds sustain
-        noteGain.gain.linearRampToValueAtTime(0, currentTime + attack + decay + sustainDuration + release);
+        this.scheduleADSR(noteOsc.noteGain, this.audioContext.currentTime, targetGain, {
+            attack: 0.8,
+            decay: 1.5,
+            sustain: 0.3,
+            release: 2.0,
+            sustainDuration
+        });
     }
     
     weightedRandom(weights) {
