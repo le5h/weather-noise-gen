@@ -55,6 +55,100 @@ export class AudioManager {
         return gain;
     }
 
+    createWetDryMix(dryRatio = 0.5, wetRatio = 0.5) {
+        const dryGain = this.createGain(dryRatio);
+        const wetGain = this.createGain(wetRatio);
+        return { dryGain, wetGain };
+    }
+
+    createSpatializer(positionData) {
+        const panNode = this.audioContext.createStereoPanner();
+        const distanceGain = this.createGain();
+
+        if (positionData) {
+            panNode.pan.value = positionData.pan;
+            const distanceVolume = 1 - (positionData.distance * 0.5);
+            distanceGain.gain.value = Math.max(0.3, distanceVolume);
+        } else {
+            panNode.pan.value = 0;
+            distanceGain.gain.value = 0.6;
+        }
+
+        return { panNode, distanceGain };
+    }
+
+    createDelayEffect(delayTime, feedbackGain, wetRatio = 0.5, dryRatio = 0.5) {
+        const delayNode = this.audioContext.createDelay(Math.max(delayTime + 0.5, 2.0));
+        delayNode.delayTime.value = delayTime;
+
+        const feedback = this.createGain(feedbackGain);
+        const { dryGain, wetGain } = this.createWetDryMix(dryRatio, wetRatio);
+
+        delayNode.connect(feedback);
+        feedback.connect(delayNode);
+
+        return { delayNode, feedback, dryGain, wetGain };
+    }
+
+    createFilterChain(filterConfigs) {
+        const filters = filterConfigs.map(cfg => this.createFilter(cfg.type, cfg.frequency, cfg.q || 1));
+        for (let i = 0; i < filters.length - 1; i++) {
+            filters[i].connect(filters[i + 1]);
+        }
+        return filters;
+    }
+
+    createOscillatorBank(configs, { lfo = null, lfoDepth = 0, masterGain = null } = {}) {
+        const oscillators = [];
+        const gains = [];
+        const panners = [];
+        const lfos = [];
+
+        const lfoGain = lfo ? this.createGain(lfoDepth) : null;
+        if (lfo && lfoGain) {
+            lfo.connect(lfoGain);
+            lfos.push(lfoGain);
+        }
+
+        configs.forEach(cfg => {
+            const osc = this.audioContext.createOscillator();
+            const gain = this.createGain(cfg.gain || 0.2);
+
+            osc.type = cfg.type || 'sine';
+            osc.frequency.value = cfg.frequency;
+
+            if (lfoGain && cfg.modulate !== false) {
+                lfoGain.connect(osc.frequency);
+            }
+
+            let lastNode = osc;
+
+            if (cfg.pan !== undefined) {
+                const panner = this.audioContext.createStereoPanner();
+                panner.pan.value = cfg.pan;
+                lastNode.connect(gain);
+                gain.connect(panner);
+                panners.push(panner);
+                lastNode = panner;
+            } else {
+                lastNode.connect(gain);
+            }
+
+            oscillators.push(osc);
+            gains.push(gain);
+            osc.start();
+        });
+
+        if (masterGain) {
+            [...panners, ...gains.filter((_, i) => !configs[i].pan !== undefined)].forEach(node => {
+                if (!panners.includes(node)) node.connect(masterGain);
+            });
+            panners.forEach(p => p.connect(masterGain));
+        }
+
+        return { oscillators, gains, panners, lfos };
+    }
+
     safeStop(node) {
         if (!node) return;
         try {
@@ -503,68 +597,41 @@ export class AudioManager {
         thunderSource.buffer = thunderBuffer;
         
         // Apply spatial audio based on lightning position
-        const panNode = this.audioContext.createStereoPanner();
-        const distanceGain = this.audioContext.createGain();
-        
-        if (positionData) {
-            // Apply panning based on lightning position
-            panNode.pan.value = positionData.pan; // -1 (left) to 1 (right)
-            
-            // Apply distance-based volume (closer = louder)
-            const distanceVolume = 1 - (positionData.distance * 0.5); // Reduce volume by up to 50% at edges
-            distanceGain.gain.value = Math.max(0.3, distanceVolume); // Minimum 30% volume
-        } else {
-            // Default center position
-            panNode.pan.value = 0;
-            distanceGain.gain.value = 0.6;
-        }
+        const { panNode, distanceGain } = this.createSpatializer(positionData);
         
         // Create reverb effect using pre-generated data or fallback
         const convolver = this.audioContext.createConvolver();
         
         if (reverbData) {
-            // Use pre-generated reverb from worker
-            const reverbDuration = 4;
             const reverbBuffer = this.audioContext.createBuffer(2, reverbData.length / 2, this.audioContext.sampleRate);
             reverbBuffer.copyToChannel(reverbData.slice(0, reverbData.length / 2), 0);
             reverbBuffer.copyToChannel(reverbData.slice(reverbData.length / 2), 1);
             convolver.buffer = reverbBuffer;
         } else {
-            // Fallback: generate reverb on main thread (simplified)
             convolver.buffer = this.createReverbBuffer(2, 1.2, 0.4, 2);
         }
         
         // Apply additional filtering for thunder character
-        const thunderFilter = this.audioContext.createBiquadFilter();
-        thunderFilter.type = 'lowpass';
+        const [thunderFilter, bodyFilter] = this.createFilterChain([
+            { type: 'lowpass', frequency: 2000, q: 1.5 },
+            { type: 'bandpass', frequency: 60, q: 0.8 }
+        ]);
         thunderFilter.frequency.setValueAtTime(2000, this.audioContext.currentTime);
         thunderFilter.frequency.exponentialRampToValueAtTime(80, this.audioContext.currentTime + duration);
-        thunderFilter.Q.value = 1.5;
-        
-        // Add body filter for low-end weight
-        const bodyFilter = this.audioContext.createBiquadFilter();
-        bodyFilter.type = 'bandpass';
-        bodyFilter.frequency.value = 60;
-        bodyFilter.Q.value = 0.8;
         
         const thunderGain = this.audioContext.createGain();
         thunderGain.gain.value = 0.6;
         
         // Create wet/dry mix with wetter reverb
-        const dryGain = this.audioContext.createGain();
-        dryGain.gain.value = 0.3; // Less dry signal
-        const wetGain = this.audioContext.createGain();
-        wetGain.gain.value = 0.7; // More wet signal (reverb)
+        const { dryGain, wetGain } = this.createWetDryMix(0.3, 0.7);
         
-        // Connect audio graph with spatial processing
+        // Connect audio graph: source → filters → distance → wet/dry → panner → destination
         thunderSource.connect(thunderFilter);
         thunderFilter.connect(bodyFilter);
-        bodyFilter.connect(distanceGain); // Apply distance-based volume
+        bodyFilter.connect(distanceGain);
         distanceGain.connect(dryGain);
         bodyFilter.connect(convolver);
         convolver.connect(wetGain);
-        
-        // Apply panning to both dry and wet signals
         dryGain.connect(panNode);
         wetGain.connect(panNode);
         panNode.connect(this.audioContext.destination);
@@ -589,36 +656,40 @@ export class AudioManager {
         const masterGain = this.createGain(0.20);
         const filter = this.createFilter('lowpass', 150, 0.8);
         const lfo = this.createLFO(0.08, 'sine');
-        const lfoGain = this.createGain(0.03);
+        const lfoDepth = 0.03;
 
-        const oscillators = [];
-        const allGains = [masterGain, lfoGain];
+        // Create oscillator bank with per-note ADSR gains
+        const sunConfigs = sunNotes.map((note, index) => ({
+            frequency: note.frequency,
+            gain: 0.2 * (index < 4 ? 0.3 : (index < 8 ? 0.5 : 0.7)),
+            name: note.name
+        }));
 
-        sunNotes.forEach((note, index) => {
-            const osc = this.audioContext.createOscillator();
-            const oscGain = this.createGain(0.2 * (index < 4 ? 0.3 : (index < 8 ? 0.5 : 0.7)));
-            const noteGain = this.createGain(0);
+        const { oscillators, gains, lfos } = this.createOscillatorBank(sunConfigs, { lfo, lfoDepth });
 
-            osc.type = 'sine';
-            osc.frequency.value = note.frequency;
+        // Add ADSR envelope gains per note
+        const noteGains = oscillators.map(() => this.createGain(0));
+        const allGains = [...gains, masterGain, ...lfos, ...noteGains];
 
-            lfo.connect(lfoGain);
-            lfoGain.connect(osc.frequency);
+        // Re-chain: osc → noteGain → oscGain → filter → master
+        oscillators.forEach((osc, i) => {
+            const oscGain = gains[i];
+            const noteGain = noteGains[i];
+            osc.disconnect();
             osc.connect(noteGain);
             noteGain.connect(oscGain);
             oscGain.connect(filter);
-
-            oscillators.push({ osc, gain: oscGain, noteGain, note: note.name, frequency: note.frequency });
-            allGains.push(oscGain, noteGain);
-            osc.start();
         });
 
         filter.connect(masterGain);
         masterGain.connect(this.audioContext.destination);
         lfo.start();
 
-        this.registerNodes('sun', { oscillators: oscillators.map(o => o.osc), gains: allGains, filters: [filter], lfos: [lfo] });
-        this.sunOscillators = oscillators;
+        this.registerNodes('sun', { oscillators, gains: allGains, filters: [filter], lfos: [lfo] });
+        this.sunOscillators = oscillators.map((osc, i) => ({
+            osc, gain: gains[i], noteGain: noteGains[i],
+            note: sunNotes[i].name, frequency: sunNotes[i].frequency
+        }));
         this.startSunNoteTriggers();
 
         console.log('Sun humming sound started successfully');
@@ -690,78 +761,62 @@ export class AudioManager {
 
         const masterGain = this.createGain(0);
         const lfo = this.createLFO(sirenConfig.frequency.sweepRate, 'sine');
-        const lfoGain = this.createGain((sirenConfig.frequency.max - sirenConfig.frequency.min) / 2);
+        const lfoDepth = (sirenConfig.frequency.max - sirenConfig.frequency.min) / 2;
         const offsetGain = this.createGain((sirenConfig.frequency.min + sirenConfig.frequency.max) / 2);
 
-        const oscillators = [];
-        const panners = [];
-        const gains = [masterGain, lfoGain, offsetGain];
-        const filters = [];
+        // Create oscillators with panning using bank helper
+        const sirenOscConfigs = sirenConfig.oscillators.map(cfg => ({
+            frequency: sirenConfig.frequency.min + lfoDepth,
+            gain: cfg.gain,
+            pan: cfg.pan,
+            type: 'sawtooth'
+        }));
 
-        // Create oscillators with panners
-        sirenConfig.oscillators.forEach(config => {
-            const osc = this.audioContext.createOscillator();
-            const panner = this.audioContext.createStereoPanner();
-            const gain = this.createGain(config.gain);
+        const { oscillators, gains, panners, lfos } = this.createOscillatorBank(sirenOscConfigs, { lfo, lfoDepth, masterGain });
 
-            osc.type = 'sawtooth';
-            panner.pan.value = config.pan;
+        // Connect offset to all oscillator frequencies (adds base pitch to LFO modulation)
+        oscillators.forEach(osc => offsetGain.connect(osc.frequency));
 
-            osc.connect(gain);
-            gain.connect(panner);
-            panner.connect(masterGain);
-
-            lfo.connect(lfoGain);
-            lfoGain.connect(osc.frequency);
-            offsetGain.connect(osc.frequency);
-
-            oscillators.push(osc);
-            panners.push(panner);
-            gains.push(gain);
-            osc.start();
-        });
+        gains.push(offsetGain);
+        const allGains = [...gains, masterGain, ...lfos];
 
         // Restore volume after LFO phase sync
         const restoreTime = this.audioContext.currentTime + (3 / (sirenConfig.frequency.sweepRate * 4));
         masterGain.gain.linearRampToValueAtTime(sirenConfig.gain.main, restoreTime + 0.1);
 
-        // Create delay/echo effect
-        const delayNode = this.audioContext.createDelay(sirenConfig.delay.maxDelay);
-        delayNode.delayTime.value = sirenConfig.delay.time;
-        const feedbackGain = this.createGain(sirenConfig.gain.feedback);
-        const wetGain = this.createGain(sirenConfig.gain.wet);
-        const dryGain = this.createGain(sirenConfig.gain.dry);
+        // Create delay/echo effect using helper
+        const { delayNode, feedback, dryGain, wetGain } = this.createDelayEffect(
+            sirenConfig.delay.time,
+            sirenConfig.gain.feedback,
+            sirenConfig.gain.wet,
+            sirenConfig.gain.dry
+        );
 
-        gains.push(feedbackGain, wetGain, dryGain);
+        gains.push(feedback, wetGain, dryGain);
+        allGains.push(feedback, wetGain, dryGain);
 
         masterGain.connect(dryGain);
-        dryGain.connect(this.audioContext.destination);
-
         masterGain.connect(delayNode);
-        delayNode.connect(feedbackGain);
-        feedbackGain.connect(delayNode);
         delayNode.connect(wetGain);
-        wetGain.connect(this.audioContext.destination);
 
         // Add filters
-        const sirenFilter = this.createFilter('lowpass', sirenConfig.filters.lowpass.dryFreq, sirenConfig.filters.lowpass.dryQ);
-        const echoFilter = this.createFilter('lowpass', sirenConfig.filters.lowpass.echoFreq, sirenConfig.filters.lowpass.echoQ);
-        const highPassFilter = this.createFilter('highpass', sirenConfig.filters.highpass.freq, sirenConfig.filters.highpass.q);
+        const filters = [
+            this.createFilter('lowpass', sirenConfig.filters.lowpass.dryFreq, sirenConfig.filters.lowpass.dryQ),
+            this.createFilter('lowpass', sirenConfig.filters.lowpass.echoFreq, sirenConfig.filters.lowpass.echoQ),
+            this.createFilter('highpass', sirenConfig.filters.highpass.freq, sirenConfig.filters.highpass.q)
+        ];
+        const [sirenFilter, echoFilter, highPassFilter] = filters;
 
-        filters.push(sirenFilter, echoFilter, highPassFilter);
-
-        dryGain.disconnect();
         dryGain.connect(sirenFilter);
         sirenFilter.connect(highPassFilter);
         highPassFilter.connect(this.audioContext.destination);
 
-        wetGain.disconnect();
         wetGain.connect(echoFilter);
         echoFilter.connect(highPassFilter);
 
         lfo.start();
 
-        this.registerNodes('siren', { oscillators, gains, lfos: [lfo], filters, other: [delayNode, ...panners] });
+        this.registerNodes('siren', { oscillators, gains: allGains, lfos: [lfo], filters, other: [delayNode, ...panners] });
 
         console.log('Siren sound started successfully');
     }
