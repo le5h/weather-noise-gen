@@ -24,41 +24,13 @@ class WeatherApp {
         this.animationId = null;
         
         this.weatherConfig = {
-            sunny: {
-                name: 'Sunny',
-                particles: 50,
-                background: 'sunny'
-            },
-            snow: {
-                name: 'Heavy Snow',
-                particles: 200,
-                background: 'snow'
-            },
-            windy: {
-                name: 'Windy Storm',
-                particles: 150,
-                background: 'windy'
-            },
-            rain: {
-                name: 'Rain',
-                particles: 300,
-                background: 'rain'
-            },
-            thunder: {
-                name: 'Thunderstorm',
-                particles: 250,
-                background: 'thunder'
-            },
-            foggy: {
-                name: 'Foggy Ash',
-                particles: 180,
-                background: 'foggy'
-            },
-            ocean: {
-                name: 'Ocean Waves',
-                particles: 250,
-                background: 'ocean'
-            }
+            sunny: { name: 'Sunny', particles: 50 },
+            snow: { name: 'Heavy Snow', particles: 200 },
+            windy: { name: 'Windy Storm', particles: 150 },
+            rain: { name: 'Rain', particles: 300 },
+            thunder: { name: 'Thunderstorm', particles: 250 },
+            foggy: { name: 'Foggy Ash', particles: 180 },
+            ocean: { name: 'Ocean Waves', particles: 250 }
         };
         
         this.init();
@@ -79,7 +51,7 @@ class WeatherApp {
         this.startBtn.style.display = 'block';
     }
     
-    backToStart() {
+    cleanup() {
         // Stop animation loop
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
@@ -97,6 +69,10 @@ class WeatherApp {
         
         // Reset state
         this.isStarted = false;
+    }
+    
+    backToStart() {
+        this.cleanup();
         
         // Reset background to default
         this.weatherApp.dataset.weather = 'snow';
@@ -126,7 +102,7 @@ class WeatherApp {
         this.currentWeather = randomWeather;
         
         // Update background immediately before fade starts
-        this.weatherApp.dataset.weather = this.weatherConfig[this.currentWeather].background;
+        this.weatherApp.dataset.weather = this.currentWeather;
         
         // Hide start screen with fade effect
         this.startScreen.style.opacity = '0';
@@ -194,7 +170,7 @@ class WeatherApp {
         this.updateUI(weather);
         
         // Update background
-        this.weatherApp.dataset.weather = config.background;
+        this.weatherApp.dataset.weather = weather;
         
         // Update weather renderer
         this.renderer.setWeather(weather, config.particles);
