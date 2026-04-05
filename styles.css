@@ -122,11 +122,11 @@
     color: rgba(255, 255, 255, 0.8);
 }
 
-.sound-types, .benefits, .use-cases {
+.sound-types, .benefits, .visualization, .use-cases {
     margin-bottom: 2rem;
 }
 
-.sound-types h3, .benefits h3, .use-cases h3 {
+.sound-types h3, .benefits h3, .visualization h3, .use-cases h3 {
     font-size: 1.4rem;
     font-weight: 600;
     margin-bottom: 1rem;
@@ -134,12 +134,12 @@
     text-align: center;
 }
 
-.sound-types ul, .benefits ul {
+.sound-types ul, .benefits ul, .visualization ul, .use-cases ul {
     list-style: none;
     padding: 0;
 }
 
-.sound-types li, .benefits li {
+.sound-types li, .benefits li, .visualization li, .use-cases li {
     font-size: 1rem;
     line-height: 1.6;
     margin-bottom: 0.8rem;
@@ -148,7 +148,7 @@
     position: relative;
 }
 
-.sound-types li::before, .benefits li::before {
+.sound-types li::before, .benefits li::before, .visualization li::before, .use-cases li::before {
     content: "•";
     position: absolute;
     left: 0;
@@ -204,13 +204,30 @@
 
 .start-btn:hover {
     background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
 }
 
 .start-btn:active {
     transform: translateY(0);
+}
+
+/* Floating start button */
+.start-btn.floating {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.start-btn.floating:hover {
+    transform: translateX(-50%) translateY(-2px);
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+}
+
+.start-btn.floating:active {
+    transform: translateX(-50%) translateY(0);
 }
 
 @keyframes fadeInUp {

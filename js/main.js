@@ -75,6 +75,8 @@ class WeatherApp {
     showStartScreen() {
         this.startScreen.style.display = 'flex';
         this.weatherControls.style.display = 'none';
+        // Show floating start button when back to start screen
+        this.startBtn.style.display = 'block';
     }
     
     backToStart() {
@@ -107,11 +109,16 @@ class WeatherApp {
         setTimeout(() => {
             this.startScreen.style.opacity = '1';
             this.weatherControls.style.display = 'none';
+            // Call showStartScreen to ensure floating button appears
+            this.showStartScreen();
         }, 50);
     }
     
     startExperience() {
         this.isStarted = true;
+        
+        // Hide floating start button when experience starts
+        this.startBtn.style.display = 'none';
         
         // Select random weather mode
         const weatherTypes = Object.keys(this.weatherConfig);
