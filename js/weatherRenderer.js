@@ -46,7 +46,11 @@ const PALETTE = {
         '#8B7355', '#A0826D', '#BC9A6A', '#C4A57B', '#9B866C',
         '#7A6A50', '#8B7D6B', '#9C8B7A', '#CD853F', '#DEB887',
         '#D2B48C', '#BDB76B'
-    ]
+    ],
+    grass: {
+        blades: ['#4a7c2a', '#5a8c3a', '#3a6c1a', '#6a9c4a', '#4a8c3a'],
+        highlights: ['#6a9c4a', '#7aac5a', '#5a8c3a', '#8abc6a', '#6a9c5a']
+    }
 };
 
 const WEATHER_TYPE_MAP = {
@@ -476,14 +480,25 @@ export class WeatherRenderer {
             opacity: 0,
             branches: []
         };
+        this.grass = {
+            blades: [],
+            time: 0
+        };
     }
     
     resize(width, height) {
         this.canvasWidth = width;
         this.canvasHeight = height;
         
-        // Don't recreate particles on resize - just update canvas dimensions
-        // Particles will adapt to new dimensions in their update methods
+        // Recreate grass blades when resized
+        this.initGrass();
+        
+        // Recreate particles when resized so they reposition correctly
+        // Only needed for sun (centers at h/3) and ocean (centers at h*0.5)
+        // Other weather types naturally adapt via wrapping/resetting at edges
+        if (this.particles.length > 0 && (this.currentWeather === 'sunny' || this.currentWeather === 'ocean')) {
+            this.createParticles();
+        }
     }
     
     setWeather(weather, particleCount) {
@@ -496,6 +511,11 @@ export class WeatherRenderer {
         this.currentWeather = weather;
         this.particleCount = particleCount;
         this.createParticles();
+        
+        // Initialize grass for sunny weather
+        if (weather === 'sunny') {
+            this.initGrass();
+        }
     }
     
     createParticles() {
@@ -536,6 +556,11 @@ export class WeatherRenderer {
         this.particles.forEach(particle => {
             particle.update(this.canvasWidth, this.canvasHeight, this.currentWeather, deltaTime);
         });
+        
+        // Update grass animation for sunny weather
+        if (this.currentWeather === 'sunny') {
+            this.grass.time += deltaTime || 0.016;
+        }
     }
     
     draw(ctx) {
@@ -569,6 +594,7 @@ export class WeatherRenderer {
         // Draw sun for sunny weather (drawn over particles)
         if (this.currentWeather === 'sunny') {
             this.drawSun(ctx);
+            this.drawGrass(ctx);
         }
         
         ctx.restore();
@@ -885,5 +911,99 @@ export class WeatherRenderer {
         ctx.beginPath();
         ctx.arc(centerX, centerY, sunRadius, 0, Math.PI * 2);
         ctx.fill();
+    }
+    
+    initGrass() {
+        if (!this.canvasWidth || !this.canvasHeight) return;
+        
+        const bladeCount = Math.floor(this.canvasWidth / 12); // Reduced count: one blade every 12 pixels
+        this.grass.blades = [];
+        
+        for (let i = 0; i < bladeCount; i++) {
+            const x = (i / bladeCount) * this.canvasWidth + (Math.random() - 0.5) * 8;
+            const baseHeight = 90 + Math.random() * 150; // 90-240px height (3x larger)
+            const heightVariation = Math.random() * 60;
+            
+            this.grass.blades.push({
+                x: x,
+                baseY: this.canvasHeight,
+                height: baseHeight + heightVariation,
+                width: 6 + Math.random() * 9, // 3x wider: 6-15px
+                color: PALETTE.grass.blades[Math.floor(Math.random() * PALETTE.grass.blades.length)],
+                highlight: PALETTE.grass.highlights[Math.floor(Math.random() * PALETTE.grass.highlights.length)],
+                swaySpeed: 0.5 + Math.random() * 1.5,
+                swayOffset: Math.random() * Math.PI * 2,
+                stiffness: 0.3 + Math.random() * 0.4,
+                curveAmount: 30 + Math.random() * 60 // 3x curve amount
+            });
+        }
+    }
+    
+    drawGrass(ctx) {
+        if (this.grass.blades.length === 0) {
+            this.initGrass();
+        }
+        
+        ctx.save();
+        
+        const time = this.grass.time;
+        const windStrength = 15 + Math.sin(time * 0.5) * 5; // Varying wind strength
+        
+        this.grass.blades.forEach(blade => {
+            // Calculate sway based on wind and blade properties
+            const sway = Math.sin(time * blade.swaySpeed + blade.swayOffset) * windStrength * blade.stiffness;
+            const tipX = blade.x + sway + blade.curveAmount;
+            const tipY = blade.baseY - blade.height + Math.abs(sway) * 0.3;
+            
+            // Control point for quadratic curve
+            const ctrlX = blade.x + sway * 0.5;
+            const ctrlY = blade.baseY - blade.height * 0.6;
+            
+            // Draw grass blade as curved path
+            ctx.beginPath();
+            ctx.moveTo(blade.x - blade.width / 2, blade.baseY);
+            
+            // Left side curve
+            ctx.quadraticCurveTo(
+                blade.x - blade.width / 4, 
+                blade.baseY - blade.height * 0.5,
+                tipX, 
+                tipY
+            );
+            
+            // Right side curve
+            ctx.quadraticCurveTo(
+                blade.x + blade.width / 4,
+                blade.baseY - blade.height * 0.5,
+                blade.x + blade.width / 2,
+                blade.baseY
+            );
+            
+            ctx.closePath();
+            
+            // Gradient from base to tip
+            const gradient = ctx.createLinearGradient(blade.x, blade.baseY, tipX, tipY);
+            gradient.addColorStop(0, blade.color);
+            gradient.addColorStop(0.7, blade.highlight);
+            gradient.addColorStop(1, blade.highlight);
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Add subtle highlight on the left edge
+            ctx.beginPath();
+            ctx.moveTo(blade.x - blade.width / 2, blade.baseY);
+            ctx.quadraticCurveTo(
+                blade.x - blade.width / 4,
+                blade.baseY - blade.height * 0.5,
+                tipX,
+                tipY
+            );
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 0.5;
+            ctx.stroke();
+        });
+        
+        ctx.restore();
     }
 }
