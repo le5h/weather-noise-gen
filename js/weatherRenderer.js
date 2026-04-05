@@ -30,15 +30,17 @@ const PALETTE = {
         oceanShimmer: 'rgba(255, 255, 255, 0.6)'
     },
     lightning: {
-        skyFlashInner: (op) => `rgba(255, 255, 255, ${op * 0.1})`,
-        skyFlashMid: (op) => `rgba(200, 220, 255, ${op * 0.05})`,
-        skyFlashOuter: 'rgba(100, 150, 255, 0)',
+        skyFlashInner: (op) => `rgba(255, 255, 255, ${op * 0.25})`,
+        skyFlashMid: (op) => `rgba(220, 235, 255, ${op * 0.15})`,
+        skyFlashOuter: 'rgba(180, 200, 255, 0)',
         boltStart: (op) => `rgba(255, 255, 255, ${op})`,
         boltMid1: (op) => `rgba(220, 240, 255, ${op * 0.9})`,
         boltMid2: (op) => `rgba(180, 220, 255, ${op * 0.6})`,
         boltEnd: (op) => `rgba(150, 200, 255, ${op * 0.2})`,
         branch: (op) => `rgba(200, 220, 255, ${op})`,
-        glow: (op) => `rgba(180, 220, 255, ${op})`
+        glow: (op) => `rgba(180, 220, 255, ${op})`,
+        glowCore: (op) => `rgba(255, 255, 255, ${op * 0.8})`,
+        glowOuter: (op) => `rgba(200, 230, 255, ${op * 0.4})`
     },
     leaves: [
         '#8B7355', '#A0826D', '#BC9A6A', '#C4A57B', '#9B866C',
@@ -577,14 +579,20 @@ export class WeatherRenderer {
         
         ctx.save();
         
-        // Brighten sky when lightning strikes
-        if (this.lightning.opacity > 0.5) {
+        // Brighten sky when lightning strikes - enhanced whitening effect
+        if (this.lightning.opacity > 0.3) {
+            // Full screen white overlay for maximum whitening
+            ctx.save();
+            ctx.fillStyle = `rgba(255, 255, 255, ${this.lightning.opacity * 0.15})`;
+            ctx.fillRect(0, 0, this.canvasWidth, this.canvasHeight);
+            ctx.restore();
+            
             const skyFlash = ctx.createRadialGradient(
                 this.lightning.x, this.lightning.y, 0,
-                this.lightning.x, this.lightning.y, this.canvasWidth
+                this.lightning.x, this.lightning.y, this.canvasWidth * 0.8
             );
             skyFlash.addColorStop(0, PALETTE.lightning.skyFlashInner(this.lightning.opacity));
-            skyFlash.addColorStop(0.5, PALETTE.lightning.skyFlashMid(this.lightning.opacity));
+            skyFlash.addColorStop(0.4, PALETTE.lightning.skyFlashMid(this.lightning.opacity));
             skyFlash.addColorStop(1, PALETTE.lightning.skyFlashOuter);
             
             ctx.fillStyle = skyFlash;
@@ -621,10 +629,12 @@ export class WeatherRenderer {
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             
-            // Add glow for outer layers
-            if (i < 2) {
-                ctx.shadowBlur = 30 + i * 10;
-                ctx.shadowColor = PALETTE.lightning.glow(this.lightning.opacity * (0.15 + i * 0.1));
+            // Add glow for outer layers - enhanced glow effect
+            if (i < 3) {
+                ctx.shadowBlur = 60 + i * 20;
+                ctx.shadowColor = i === 0 
+                    ? PALETTE.lightning.glowCore(this.lightning.opacity * 0.5)
+                    : PALETTE.lightning.glowOuter(this.lightning.opacity * 0.3);
             }
             
             // Draw the entire path with variable width using line segments
@@ -678,9 +688,9 @@ export class WeatherRenderer {
                 ctx.lineCap = 'round';
                 
                 if (i === 0) {
-                    const glowFactor = isTrail ? 0.3 : 0.6;
-                    ctx.shadowBlur = 10 * (1 - branchDepth * 0.5) * glowFactor;
-                    ctx.shadowColor = PALETTE.lightning.glow(opacity * 0.3);
+                    const glowFactor = isTrail ? 0.5 : 1.0;
+                    ctx.shadowBlur = 25 * (1 - branchDepth * 0.3) * glowFactor;
+                    ctx.shadowColor = PALETTE.lightning.glowOuter(opacity * 0.5);
                 }
                 
                 ctx.beginPath();
