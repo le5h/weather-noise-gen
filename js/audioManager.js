@@ -307,6 +307,11 @@ export class AudioManager {
             console.log('Audio not initialized yet');
             return;
         }
+
+        if (this.currentWeather === weather) {
+            console.log('Already in weather mode:', weather);
+            return;
+        }
         
         console.log('Setting weather audio to:', weather);
         this.stopAllSounds();
@@ -473,7 +478,7 @@ export class AudioManager {
     startWindHowlSound() {
         this.startSimpleNoiseSound('windHowl', {
             amplitude: 0.08,
-            duration: 3,
+            duration: 6,
             filterType: 'lowpass',
             frequency: 800,
             q: 2,
@@ -485,13 +490,13 @@ export class AudioManager {
 
     startThunderRainSound() {
         this.startSimpleNoiseSound('thunderRain', {
-            amplitude: 0.08,
+            amplitude: 0.05,
             duration: 2,
             filterType: 'lowpass',
-            frequency: 1200,
-            q: 1.5,
-            gain: 0.12,
-            secondFilter: { type: 'bandpass', frequency: 800, q: 2 }
+            frequency: 6000,
+            q: 0.8,
+            gain: 0.25,
+            secondFilter: { type: 'highpass', frequency: 200, q: 0.5 }
         });
     }
 
@@ -764,11 +769,11 @@ export class AudioManager {
                 { gain: 0.15, pan: 0.3 }, { gain: 0.10, pan: 0.8 }
             ],
             frequency: { min: 100, max: 400, sweepRate: 0.05 },
-            gain: { main: 0.04, dry: 0.5, wet: 0.5, feedback: 0.4 },
+            gain: { main: 0.04, dry: 0.2, wet: 0.8, feedback: 0.7 },
             delay: { time: 1.5, maxDelay: 2.0 },
             filters: {
                 lowpass: { dryFreq: 1200, dryQ: 1.5, echoFreq: 800, echoQ: 2 },
-                highpass: { freq: 600, q: 0.8 }
+                highpass: { freq: 600, q: 0.6 }
             }
         };
 
