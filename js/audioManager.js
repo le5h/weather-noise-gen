@@ -49,6 +49,19 @@ export class AudioManager {
         return lfo;
     }
 
+    createInvertedCosineLFO(frequency) {
+        // Creates -cos(t) wave: starts at -1, rises through center (0) to +1
+        // real[1] = -1 gives -cos(ωt), imag[1] = 0 removes sin component
+        const real = new Float32Array([0, -1]);
+        const imag = new Float32Array([0, 0]);
+        const periodicWave = this.audioContext.createPeriodicWave(real, imag);
+        
+        const lfo = this.audioContext.createOscillator();
+        lfo.frequency.value = frequency;
+        lfo.setPeriodicWave(periodicWave);
+        return lfo;
+    }
+
     createGain(value = 1) {
         const gain = this.audioContext.createGain();
         gain.gain.value = value;
@@ -755,18 +768,19 @@ export class AudioManager {
             delay: { time: 1.5, maxDelay: 2.0 },
             filters: {
                 lowpass: { dryFreq: 1200, dryQ: 1.5, echoFreq: 800, echoQ: 2 },
-                highpass: { freq: 400, q: 0.8 }
+                highpass: { freq: 600, q: 0.8 }
             }
         };
 
         const masterGain = this.createGain(0);
-        const lfo = this.createLFO(sirenConfig.frequency.sweepRate, 'sine');
+        // Use -cos(t) LFO that starts at -1 (bottom), rises through center to +1
+        const lfo = this.createInvertedCosineLFO(sirenConfig.frequency.sweepRate);
         const lfoDepth = (sirenConfig.frequency.max - sirenConfig.frequency.min) / 2;
-        const offsetGain = this.createGain((sirenConfig.frequency.min + sirenConfig.frequency.max) / 2);
+        const centerFreq = (sirenConfig.frequency.min + sirenConfig.frequency.max) / 2;
 
         // Create oscillators with panning using bank helper
         const sirenOscConfigs = sirenConfig.oscillators.map(cfg => ({
-            frequency: sirenConfig.frequency.min + lfoDepth,
+            frequency: centerFreq,
             gain: cfg.gain,
             pan: cfg.pan,
             type: 'sawtooth'
@@ -774,13 +788,9 @@ export class AudioManager {
 
         const { oscillators, gains, panners, lfos } = this.createOscillatorBank(sirenOscConfigs, { lfo, lfoDepth, masterGain });
 
-        // Connect offset to all oscillator frequencies (adds base pitch to LFO modulation)
-        oscillators.forEach(osc => offsetGain.connect(osc.frequency));
-
-        gains.push(offsetGain);
         const allGains = [...gains, masterGain, ...lfos];
 
-        // Restore volume after LFO phase sync
+        // Restore volume after LFO phase sync (original slow fade-in)
         const restoreTime = this.audioContext.currentTime + (3 / (sirenConfig.frequency.sweepRate * 4));
         masterGain.gain.linearRampToValueAtTime(sirenConfig.gain.main, restoreTime + 0.1);
 
