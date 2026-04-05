@@ -3,6 +3,131 @@
  * Handles all particle animation and rendering logic
  */
 
+const WEATHER_CONFIG = {
+    sun: {
+        init: (w, h, initial) => {
+            const angle = Math.random() * Math.PI * 2;
+            const distance = 50 + Math.random() * 150;
+            return {
+                x: w / 2 + Math.cos(angle) * distance,
+                y: h / 3 + Math.sin(angle) * distance,
+                vx: Math.cos(angle) * 1.5,
+                vy: Math.sin(angle) * 1.5,
+                size: Math.random() * 3 + 2,
+                opacity: Math.random() * 0.6 + 0.4,
+                pulsePhase: Math.random() * Math.PI * 2
+            };
+        }
+    },
+    thunder: {
+        init: (w, h) => ({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: (Math.random() - 0.5) * 6,
+            vy: Math.random() * 24 + 30,
+            size: Math.random() * 3 + 2,
+            opacity: Math.random() * 0.3 + 0.2,
+            length: Math.random() * 20 + 15
+        })
+    },
+    foggy: {
+        init: (w, h) => ({
+            x: Math.random() * w,
+            y: Math.random() * -h,
+            vx: (Math.random() - 0.5) * 0.04,
+            vy: Math.random() * 0.4 + 0.2,
+            size: Math.random() * 4 + 2,
+            opacity: Math.random() * 0.3 + 0.1,
+            swayAmount: Math.random() * 0.2 + 0.1,
+            swaySpeed: Math.random() * 0.001 + 0.0005,
+            swayAngle: Math.random() * Math.PI * 2
+        })
+    },
+    snow: {
+        init: () => ({
+            vx: (Math.random() - 0.5) * 2,
+            vy: Math.random() * 4 + 2,
+            size: Math.random() * 3 + 1,
+            opacity: Math.random() * 0.6 + 0.4,
+            swayAmount: Math.random() * 4 + 2,
+            swaySpeed: Math.random() * 0.02 + 0.01,
+            swayAngle: Math.random() * Math.PI * 2
+        })
+    },
+    rain: {
+        init: () => ({
+            vx: (Math.random() - 0.5) * 4,
+            vy: Math.random() * 16 + 24,
+            size: Math.random() * 2 + 1,
+            opacity: Math.random() * 0.4 + 0.3,
+            length: Math.random() * 15 + 10
+        })
+    },
+    windy: {
+        init: (w, h) => ({
+            x: Math.random() * w,
+            y: Math.random() * h,
+            vx: Math.random() * 6 + 4,
+            vy: Math.random() * 2 + 1,
+            size: Math.random() * 8 + 4,
+            opacity: Math.random() * 0.4 + 0.6,
+            swayAmount: Math.random() * 6 + 4,
+            swaySpeed: Math.random() * 0.03 + 0.01,
+            swayAngle: Math.random() * Math.PI * 2,
+            rotation: Math.random() * Math.PI * 2,
+            rotationSpeed: (Math.random() - 0.5) * 0.1,
+            leafColor: null,
+            leafType: Math.floor(Math.random() * 3)
+        })
+    },
+    ocean: {
+        init: (w, h) => {
+            const centerBias = Math.random() < 0.7;
+            const centerY = h * 0.5;
+            let x, y;
+            if (centerBias) {
+                const spreadY = Math.random() * h * 0.15;
+                x = Math.random() * w;
+                y = centerY + Math.random() * spreadY;
+            } else {
+                x = Math.random() * w;
+                y = h * 0.5 + Math.random() * h * 0.5;
+            }
+            const verticalPosition = (y - h * 0.5) / (h * 0.5);
+            const thickness = 0.1 + verticalPosition * 11.9;
+            const distanceFactor = verticalPosition;
+            const baseSpeed = 0.033 + distanceFactor * 1.3;
+            const baseSize = thickness * (0.5 + distanceFactor * 0.5);
+            const sizeVariation = 1 + (Math.random() - 0.5) * 0.4;
+            const speedVariation = 1 + (Math.random() - 0.5) * 0.1;
+            const direction = Math.random() < 0.5 ? 1 : -1;
+            const reflectionIntensity = 1 - verticalPosition * 0.7;
+            const skyColors = [
+                { r: 200, g: 170, b: 180 },
+                { r: 180, g: 150, b: 170 },
+                { r: 160, g: 130, b: 160 },
+                { r: 140, g: 110, b: 150 },
+                { r: 120, g: 90, b: 130 }
+            ];
+            const colorChoice = skyColors[Math.floor(Math.random() * skyColors.length)];
+            const brightness = 1.2 + reflectionIntensity * 0.3;
+            return {
+                x, y,
+                vx: baseSpeed * speedVariation * direction,
+                vy: 0,
+                baseSize: baseSize * sizeVariation,
+                size: baseSize * sizeVariation,
+                thickness,
+                shimmerPhase: Math.random() * Math.PI * 2,
+                shimmerSpeed: Math.random() * 0.04 + 0.02,
+                shimmerAmount: Math.random() * 0.3 + 0.2,
+                particleColor: `rgba(${Math.min(255, colorChoice.r * brightness)}, ${Math.min(255, colorChoice.g * brightness)}, ${Math.min(255, colorChoice.b * brightness)}, ${0.3 + reflectionIntensity * 0.15})`,
+                opacity: 0.2 + reflectionIntensity * 0.2
+            };
+        }
+    }
+};
+
 class Particle {
     constructor(type, canvasWidth, canvasHeight) {
         this.type = type;
@@ -10,149 +135,19 @@ class Particle {
     }
     
     reset(canvasWidth, canvasHeight, initial = false) {
-        this.x = Math.random() * canvasWidth;
-        this.y = initial ? Math.random() * canvasHeight : -20;
-        
-        switch (this.type) {
-            case 'sun':
-                // Sun rays emanating from center - make longer and brighter
-                const angle = Math.random() * Math.PI * 2;
-                const distance = 50 + Math.random() * 150; // Closer to sun for brighter effect
-                this.x = canvasWidth / 2 + Math.cos(angle) * distance;
-                this.y = canvasHeight / 3 + Math.sin(angle) * distance;
-                this.vx = Math.cos(angle) * 1.5; // Faster movement for longer rays
-                this.vy = Math.sin(angle) * 1.5; // Faster movement for longer rays
-                this.size = Math.random() * 3 + 2; // Larger size for brightness
-                this.opacity = Math.random() * 0.6 + 0.4; // Brighter opacity
-                this.pulsePhase = Math.random() * Math.PI * 2;
-                break;
-                
-            case 'thunder':
-                // Rain particles for thunderstorm - start in place
-                this.x = Math.random() * canvasWidth;
-                this.y = Math.random() * canvasHeight; // Start randomly in canvas, not from top
-                this.vx = (Math.random() - 0.5) * 6; // Increased from 3 to 6
-                this.vy = Math.random() * 24 + 30; // Increased from 12+15 to 24+30
-                this.size = Math.random() * 3 + 2;
-                this.opacity = Math.random() * 0.3 + 0.2; // Reduced from 0.6+0.4 to 0.3+0.2 for more transparency
-                this.length = Math.random() * 20 + 15;
-                break;
-                
-            case 'foggy':
-                // Dark ash particles for foggy weather
-                this.x = Math.random() * canvasWidth;
-                this.y = Math.random() * -canvasHeight;
-                this.vx = (Math.random() - 0.5) * 0.04; // Increased from 0.02 to 0.04
-                this.vy = Math.random() * 0.4 + 0.2; // Increased from 0.2+0.1 to 0.4+0.2
-                this.size = Math.random() * 4 + 2;
-                this.opacity = Math.random() * 0.3 + 0.1;
-                this.swayAmount = Math.random() * 0.2 + 0.1; // Increased sway amount
-                this.swaySpeed = Math.random() * 0.001 + 0.0005; // Very slow sway
-                this.swayAngle = Math.random() * Math.PI * 2;
-                break;
-                
-            case 'snow':
-                this.vx = (Math.random() - 0.5) * 2; // Increased from 1 to 2
-                this.vy = Math.random() * 4 + 2; // Increased from 2+1 to 4+2
-                this.size = Math.random() * 3 + 1;
-                this.opacity = Math.random() * 0.6 + 0.4;
-                this.swayAmount = Math.random() * 4 + 2; // Increased sway amount
-                this.swaySpeed = Math.random() * 0.02 + 0.01;
-                this.swayAngle = Math.random() * Math.PI * 2;
-                break;
-                
-            case 'rain':
-                this.vx = (Math.random() - 0.5) * 4; // Increased from 2 to 4
-                this.vy = Math.random() * 16 + 24; // Increased from 8+12 to 16+24
-                this.size = Math.random() * 2 + 1;
-                this.opacity = Math.random() * 0.4 + 0.3;
-                this.length = Math.random() * 15 + 10;
-                break;
-                
-            case 'windy':
-                // Autumn falling leaves
-                this.x = Math.random() * canvasWidth;
-                this.y = Math.random() * canvasHeight;
-                this.vx = Math.random() * 6 + 4; // Wind movement
-                this.vy = Math.random() * 2 + 1; // Gentle falling
-                this.size = Math.random() * 8 + 4; // Larger leaf size
-                this.opacity = Math.random() * 0.4 + 0.6; // Good visibility
-                this.swayAmount = Math.random() * 6 + 4; // More sway for leaves
-                this.swaySpeed = Math.random() * 0.03 + 0.01;
-                this.swayAngle = Math.random() * Math.PI * 2;
-                this.rotation = Math.random() * Math.PI * 2; // Random initial rotation
-                this.rotationSpeed = (Math.random() - 0.5) * 0.1; // Rotation speed
-                this.leafColor = this.getRandomLeafColor(); // Autumn leaf color
-                this.leafType = Math.floor(Math.random() * 3); // Different leaf shapes
-                break;
-                
-            case 'ocean':
-                // Ocean shimmer particles with specified requirements
-                // Y position with falling distribution - more particles near horizon
-                const centerBias = Math.random() < 0.7; // 70% chance to spawn near horizon
-                if (centerBias) {
-                    // Y near horizon with gaussian-like distribution
-                    const centerY = canvasHeight * 0.5; // Horizon line
-                    const spreadY = Math.random() * canvasHeight * 0.15; // 15% height spread below horizon
-                    
-                    this.x = Math.random() * canvasWidth; // X completely random
-                    this.y = centerY + Math.random() * spreadY;
-                } else {
-                    // Spawn anywhere in water area
-                    this.x = Math.random() * canvasWidth; // X completely random
-                    this.y = canvasHeight * 0.5 + Math.random() * canvasHeight * 0.5;
-                }
-                
-                // Vertical position determines thickness: 50% = near 0px, 100% = 12px
-                const verticalPosition = (this.y - canvasHeight * 0.5) / (canvasHeight * 0.5); // 0 to 1
-                const thickness = 0.1 + verticalPosition * 11.9; // 0.1px to 12px (near zero at horizon)
-                
-                // Deterministic properties: horizon = almost 0, lower = bigger, lower = faster
-                // Using vertical position where higher (closer to 100% bottom) = bigger and faster
-                const distanceFactor = verticalPosition; // 0 at 50%, 1 at 100% - so higher = faster/bigger
-                
-                // Base size and speed with deterministic relationship
-                const baseSpeed = 0.033 + distanceFactor * 1.3; // 0.033-1.33 range, 3x slower
-                const baseSize = thickness * (0.5 + distanceFactor * 0.5); // Size based on thickness + position
-                
-                // Apply variations: 20% size, 5% speed
-                const sizeVariation = 1 + (Math.random() - 0.5) * 0.4; // 80%-120% of base size
-                const speedVariation = 1 + (Math.random() - 0.5) * 0.1; // 95%-105% of base speed
-                
-                // Direction: left to right or right to left
-                const direction = Math.random() < 0.5 ? 1 : -1;
-                
-                this.vx = baseSpeed * speedVariation * direction;
-                this.vy = 0; // No vertical movement
-                
-                this.baseSize = baseSize * sizeVariation;
-                this.size = this.baseSize;
-                this.thickness = thickness; // Store thickness for shamshed ellipse
-                
-                // Shimmer properties for size changes while moving
-                this.shimmerPhase = Math.random() * Math.PI * 2;
-                this.shimmerSpeed = Math.random() * 0.04 + 0.02; // Speed of size change
-                this.shimmerAmount = Math.random() * 0.3 + 0.2; // Amplitude of size change
-                
-                // Ocean shimmer colors based on sky but brighter than water
-                const reflectionIntensity = 1 - verticalPosition * 0.7; // More reflection near horizon
-                
-                // Sky colors but ensure they're brighter than marine water
-                const skyColors = [
-                    { r: 200, g: 170, b: 180 }, // Bright warm pinkish-purple
-                    { r: 180, g: 150, b: 170 }, // Bright lighter purple  
-                    { r: 160, g: 130, b: 160 }, // Bright warm purple-blue
-                    { r: 140, g: 110, b: 150 }, // Bright purple-blue
-                    { r: 120, g: 90, b: 130 }    // Bright twilight purple
-                ];
-                
-                const colorChoice = skyColors[Math.floor(Math.random() * skyColors.length)];
-                const brightness = 1.2 + reflectionIntensity * 0.3; // 1.2 to 1.5 brightness
-                
-                this.particleColor = `rgba(${Math.min(255, colorChoice.r * brightness)}, ${Math.min(255, colorChoice.g * brightness)}, ${Math.min(255, colorChoice.b * brightness)}, ${0.3 + reflectionIntensity * 0.15})`;
-                
-                this.opacity = 0.2 + reflectionIntensity * 0.2; // Much more subtle
-                break;
+        const config = WEATHER_CONFIG[this.type];
+        if (!config) return;
+
+        const props = config.init(canvasWidth, canvasHeight, initial);
+        Object.assign(this, props);
+
+        // Set initial positions for types that don't specify x/y in config
+        if (this.x === undefined) this.x = Math.random() * canvasWidth;
+        if (this.y === undefined) this.y = initial ? Math.random() * canvasHeight : -20;
+
+        // Initialize leaf color for windy
+        if (this.type === 'windy' && this.leafColor === null) {
+            this.leafColor = this.getRandomLeafColor();
         }
     }
     
@@ -178,6 +173,19 @@ class Particle {
             '#7A6A50'  // Dark tan
         ];
         return autumnColors[Math.floor(Math.random() * autumnColors.length)];
+    }
+    
+    // Unified boundary helpers
+    wrapHorizontal(canvasWidth, margin = 20) {
+        if (this.x > canvasWidth + margin) this.x = -margin;
+        if (this.x < -margin) this.x = canvasWidth + margin;
+    }
+    
+    resetAtTop(canvasWidth, canvasHeight, margin = 20) {
+        if (this.y > canvasHeight + margin) {
+            this.y = -margin;
+            this.x = Math.random() * canvasWidth;
+        }
     }
     
     update(canvasWidth, canvasHeight, weatherType, deltaTime = 0) {
@@ -210,61 +218,29 @@ class Particle {
             case 'thunder':
                 this.x += this.vx * dt * 60;
                 this.y += this.vy * dt * 60;
-                
-                // Wrap thunder rain horizontally
-                if (this.x > canvasWidth + 20) this.x = -20;
-                if (this.x < -20) this.x = canvasWidth + 20;
-                
-                // Reset from top when falling off bottom
-                if (this.y > canvasHeight + 20) {
-                    this.y = -20;
-                    this.x = Math.random() * canvasWidth;
-                }
+                this.wrapHorizontal(canvasWidth, 20);
+                this.resetAtTop(canvasWidth, canvasHeight, 20);
                 break;
                 
             case 'foggy':
                 this.x += (this.vx + Math.sin(this.swayAngle) * this.swayAmount) * dt * 60;
                 this.y += this.vy * dt * 60;
-                
-                // Wrap ash particles horizontally
-                if (this.x > canvasWidth + 20) this.x = -20;
-                if (this.x < -20) this.x = canvasWidth + 20;
-                
-                // Reset from top when falling off bottom (very slow)
-                if (this.y > canvasHeight + 20) {
-                    this.y = -20;
-                    this.x = Math.random() * canvasWidth;
-                }
+                this.wrapHorizontal(canvasWidth, 20);
+                this.resetAtTop(canvasWidth, canvasHeight, 20);
                 break;
                 
             case 'snow':
                 this.x += (this.vx + Math.sin(this.swayAngle) * this.swayAmount) * dt * 60;
                 this.y += this.vy * dt * 60;
-                
-                // Wrap snow particles horizontally
-                if (this.x > canvasWidth + 20) this.x = -20;
-                if (this.x < -20) this.x = canvasWidth + 20;
-                
-                // Reset from top when falling off bottom
-                if (this.y > canvasHeight + 20) {
-                    this.y = -20;
-                    this.x = Math.random() * canvasWidth;
-                }
+                this.wrapHorizontal(canvasWidth, 20);
+                this.resetAtTop(canvasWidth, canvasHeight, 20);
                 break;
                 
             case 'rain':
                 this.x += this.vx * dt * 60;
                 this.y += this.vy * dt * 60;
-                
-                // Wrap rain horizontally
-                if (this.x > canvasWidth + 20) this.x = -20;
-                if (this.x < -20) this.x = canvasWidth + 20;
-                
-                // Reset from top when falling off bottom
-                if (this.y > canvasHeight + 20) {
-                    this.y = -20;
-                    this.x = Math.random() * canvasWidth;
-                }
+                this.wrapHorizontal(canvasWidth, 20);
+                this.resetAtTop(canvasWidth, canvasHeight, 20);
                 break;
                 
             case 'windy':
@@ -273,8 +249,7 @@ class Particle {
                 this.rotation += this.rotationSpeed * dt * 60; // Update rotation
                 
                 // Wrap leaves horizontally, reset from top when falling off bottom
-                if (this.x > canvasWidth + 50) this.x = -50;
-                if (this.x < -50) this.x = canvasWidth + 50;
+                this.wrapHorizontal(canvasWidth, 50);
                 
                 // Reset from top when falling off bottom (like falling leaves)
                 if (this.y > canvasHeight + 50) {
@@ -291,8 +266,7 @@ class Particle {
                 this.size = this.baseSize * (1 + Math.sin(this.shimmerPhase) * this.shimmerAmount);
                 
                 // Wrap horizontally
-                if (this.x > canvasWidth + 50) this.x = -50;
-                if (this.x < -50) this.x = canvasWidth + 50;
+                this.wrapHorizontal(canvasWidth, 50);
                 break;
         }
     }
@@ -499,29 +473,17 @@ export class WeatherRenderer {
             return;
         }
         
-        let particleType;
-        switch (this.currentWeather) {
-            case 'sunny':
-                particleType = 'sun';
-                break;
-            case 'thunder':
-                particleType = 'thunder';
-                break;
-            case 'foggy':
-                particleType = 'foggy';
-                break;
-            case 'rain':
-                particleType = 'rain';
-                break;
-            case 'windy':
-                particleType = 'windy';
-                break;
-            case 'ocean':
-                particleType = 'ocean';
-                break;
-            default:
-                particleType = 'snow';
-        }
+        const WEATHER_TYPE_MAP = {
+            'sunny': 'sun',
+            'thunder': 'thunder',
+            'foggy': 'foggy',
+            'rain': 'rain',
+            'windy': 'windy',
+            'ocean': 'ocean',
+            'snow': 'snow'
+        };
+        
+        const particleType = WEATHER_TYPE_MAP[this.currentWeather] || 'snow';
         
         for (let i = 0; i < this.particleCount; i++) {
             this.particles.push(new Particle(particleType, this.canvasWidth, this.canvasHeight));
