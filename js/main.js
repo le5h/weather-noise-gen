@@ -24,8 +24,14 @@ class WeatherApp {
         this.layersRow = document.getElementById('layersRow');
         this.vibrationRow = document.getElementById('vibrationRow');
         this.vibrationBtn = this.vibrationRow.querySelector('.vib-toggle');
-        this.vibrationEnabled = navigator.vibrate ? localStorage.getItem('vibration') !== 'off' : false;
-        this.vibrationBtn.classList.toggle('muted', !this.vibrationEnabled);
+        this._vibrationSupported = 'vibrate' in navigator;
+        if (!this._vibrationSupported) {
+            this.vibrationRow.style.display = 'none';
+            this.vibrationEnabled = false;
+        } else {
+            this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
+            this.vibrationBtn.classList.toggle('muted', !this.vibrationEnabled);
+        }
         
         this.currentWeather = 'snow';
         this.renderer = new WeatherRenderer(this.canvas);
@@ -97,12 +103,12 @@ class WeatherApp {
             this.startScreen.style.opacity = '1';
             this.bottomArea.style.display = 'none';
             this.volumeRow.style.display = 'none';
-            this.vibrationRow.style.display = 'none';
+            if (this._vibrationSupported) this.vibrationRow.style.display = 'none';
             this.layersRow.style.display = 'none';
             this.layersRow.innerHTML = '';
             this.settingsBtn.classList.remove('active');
-        this.settingsOpen = false;
-        this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
+            this.settingsOpen = false;
+            this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
             // Call showStartScreen to ensure floating button appears
             this.showStartScreen();
         }, 50);
@@ -177,7 +183,7 @@ class WeatherApp {
         this.settingsBtn.addEventListener('click', () => {
             this.settingsOpen = !this.settingsOpen;
             this.volumeRow.style.display = this.settingsOpen ? 'flex' : 'none';
-            this.vibrationRow.style.display = this.settingsOpen ? 'flex' : 'none';
+            if (this._vibrationSupported) this.vibrationRow.style.display = this.settingsOpen ? 'flex' : 'none';
             this.layersRow.style.display = this.settingsOpen ? 'flex' : 'none';
             this.settingsBtn.classList.toggle('active', this.settingsOpen);
         });
@@ -242,7 +248,7 @@ class WeatherApp {
 
     vibrate(pattern) {
         if (!this.vibrationEnabled) return;
-        if (navigator.vibrate) navigator.vibrate(pattern);
+        if (typeof navigator.vibrate === 'function') navigator.vibrate(pattern);
     }
     
     setWeather(weather) {
