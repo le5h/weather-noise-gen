@@ -537,12 +537,12 @@ export class AudioManager {
     startWindSound() {
         this.startSimpleNoiseSound('wind', {
             amplitude: 0.1,
-            duration: 8,
+            duration: 10,
             filterType: 'lowpass',
             frequency: 400,
-            q: 1,
-            gain: 0.38,
-            lfo: { rate: 0.2, depth: 50, target: 'filter' }
+            q: 0.8,
+            gain: 0.4,
+            lfo: { rate: 0.12, depth: 80, target: 'filter' }
         });
     }
 
@@ -595,12 +595,12 @@ export class AudioManager {
     startTreeNoiseSound() {
         const durs = this.getCicadaDurations(3);
         this.startLayeredSound('tree', [
-            { amplitude: 0.03, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
-              lfo: { rate: 0.08, depth: 60 }, limiter: { base: 0.35 } },
-            { amplitude: 0.025, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1200, q: 1.5,
-              lfo: { rate: 0.12, depth: 200 }, limiter: { base: 0.3 } },
-            { amplitude: 0.02, bufferDuration: durs[2], filterType: 'highpass', frequency: 2000, q: 0.8,
-              lfo: { rate: 0.15, depth: 300 }, limiter: { base: 0.2 } }
+            { amplitude: 0.04, bufferDuration: durs[0], filterType: 'bandpass', frequency: 1500, q: 0.8,
+              lfo: { rate: 0.1, depth: 300 }, limiter: { base: 0.35 } },
+            { amplitude: 0.035, bufferDuration: durs[1], filterType: 'highpass', frequency: 2800, q: 0.5,
+              lfo: { rate: 0.15, depth: 500 }, limiter: { base: 0.3 } },
+            { amplitude: 0.02, bufferDuration: durs[2], filterType: 'lowpass', frequency: 600, q: 0.5,
+              lfo: { rate: 0.06, depth: 80 }, limiter: { base: 0.2 } }
         ], 0.5);
     }
 
