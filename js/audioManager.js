@@ -491,7 +491,7 @@ export class AudioManager {
         if (!this.audioContext) return;
 
         const masterGain = this.createGain(masterGainValue);
-        const allNodes = { sources: [], gains: [masterGain], lfos: [], filters: [] };
+        const allNodes = { sources: [], gains: [masterGain], lfos: [], filters: [], other: [] };
 
         // Track per-layer gains for mute control
         const layerGainMap = new Map();
@@ -509,28 +509,20 @@ export class AudioManager {
 
             source.connect(filter);
 
-            let lastNode = filter;
-
             if (layer.lfo) {
                 const { lfo, lfoGain } = this.connectLFO(layer.lfo.rate, filter.frequency, layer.lfo.depth, name);
                 allNodes.lfos.push(lfo, lfoGain);
             }
 
-            // Create per-layer gain for mute/unmute
-            const layerGain = this.createGain(1);
-            allNodes.gains.push(layerGain);
-            layerGainMap.set(layerName, layerGain);
+            let preGainNode = filter;
 
             if (layer.burstLfo) {
                 const burstGain = this.createGain(layer.burstLfo.baseGain || 0.4);
                 const { lfo: burstLfo, lfoGain: burstGainLfo } = this.connectLFO(layer.burstLfo.rate, burstGain.gain, layer.burstLfo.depth, name);
-
                 filter.connect(burstGain);
-                burstGain.connect(layerGain);
-                layerGain.connect(masterGain);
                 allNodes.lfos.push(burstLfo, burstGainLfo);
                 allNodes.gains.push(burstGain);
-                lastNode = null;
+                preGainNode = burstGain;
             } else if (layer.envelope) {
                 const envelope = this.createGain(layer.envelope.base);
                 if (layer.envelope.lfo) {
@@ -539,26 +531,33 @@ export class AudioManager {
                     allNodes.lfos.push(lfo, lfoGain);
                 }
                 filter.connect(envelope);
-
                 const layerGain2 = this.createGain(layer.layerGain || 0.5);
                 envelope.connect(layerGain2);
-                layerGain2.connect(layerGain);
-                layerGain.connect(masterGain);
                 allNodes.gains.push(envelope, layerGain2);
-                lastNode = null;
+                preGainNode = layerGain2;
             } else if (layer.limiter) {
                 const limiter = this.createGain(layer.limiter.base);
                 filter.connect(limiter);
-                limiter.connect(layerGain);
-                layerGain.connect(masterGain);
                 allNodes.gains.push(limiter);
-                lastNode = null;
+                preGainNode = limiter;
             }
 
-            if (lastNode) {
-                lastNode.connect(layerGain);
-                layerGain.connect(masterGain);
+            // Insert stereo panner if requested
+            if (layer.pan !== undefined) {
+                const panner = this.audioContext.createStereoPanner();
+                panner.pan.value = layer.pan;
+                preGainNode.connect(panner);
+                allNodes.other.push(panner);
+                preGainNode = panner;
             }
+
+            // Create per-layer gain for mute/unmute
+            const layerGain = this.createGain(1);
+            allNodes.gains.push(layerGain);
+            layerGainMap.set(layerName, layerGain);
+
+            preGainNode.connect(layerGain);
+            layerGain.connect(masterGain);
 
             source.start();
         }
@@ -587,6 +586,14 @@ export class AudioManager {
         if (!gn) return;
 
         gn.gain.value = muted ? 0 : 1;
+
+        // Kill siren delay feedback when muting
+        if (groupName === 'siren' && this._sirenFeedback) {
+            const now = this.audioContext.currentTime;
+            this._sirenFeedback.gain.cancelScheduledValues(now);
+            this._sirenFeedback.gain.setValueAtTime(this._sirenFeedback.gain.value, now);
+            this._sirenFeedback.gain.linearRampToValueAtTime(muted ? 0 : 0.7, now + 0.15);
+        }
 
         if (!this._mutedLayers.has(groupName)) {
             this._mutedLayers.set(groupName, new Set());
@@ -675,6 +682,9 @@ export class AudioManager {
             this._thunderMaster = null;
         }
 
+        // Clear siren feedback reference
+        this._sirenFeedback = null;
+
         // Clear drift modulation timeouts
         for (const tid of this.driftTimeouts) {
             clearTimeout(tid);
@@ -699,14 +709,13 @@ export class AudioManager {
     }
 
     startRainSound() {
-        const durs = this.getCicadaDurations(3);
         this.startLayeredSound('rain', [
-            { name: 'Mid Rain', amplitude: 0.06, bufferDuration: durs[0], filterType: 'bandpass', frequency: 1400, q: 0.5,
-              lfo: { rate: 0.4, depth: 300 }, limiter: { base: 0.3 } },
-            { name: 'High Rain', amplitude: 0.05, bufferDuration: durs[1], filterType: 'bandpass', frequency: 2000, q: 0.4,
+            { name: 'Mid Rain', amplitude: 0.07, bufferDuration: 41, filterType: 'bandpass', frequency: 1400, q: 0.5,
+              lfo: { rate: 0.4, depth: 300 }, limiter: { base: 0.25 } },
+            { name: 'High Rain', amplitude: 0.06, bufferDuration: 47, filterType: 'bandpass', frequency: 2000, q: 0.4,
               lfo: { rate: 0.5, depth: 400 }, limiter: { base: 0.25 } },
-            { name: 'Low Rumble', amplitude: 0.04, bufferDuration: durs[2], filterType: 'lowpass', frequency: 500, q: 0.6,
-              lfo: { rate: 0.15, depth: 150 }, limiter: { base: 0.2 } }
+            { name: 'Low Rumble', amplitude: 0.05, bufferDuration: 53, filterType: 'lowpass', frequency: 500, q: 0.6,
+              lfo: { rate: 0.15, depth: 150 }, limiter: { base: 0.35 } }
         ], 0.6);
     }
 
@@ -721,22 +730,21 @@ export class AudioManager {
     }
 
     startThunderRainSound() {
-        const durs = this.getCicadaDurations(3);
         this.startLayeredSound('thunderRain', [
-            { name: 'Bass', amplitude: 0.07, bufferDuration: durs[0], filterType: 'lowpass', frequency: 5000, q: 0.5,
-              limiter: { base: 0.45 } },
-            { name: 'Mid Pass', amplitude: 0.06, bufferDuration: durs[1], filterType: 'highpass', frequency: 200, q: 0.5,
-              limiter: { base: 0.4 } },
-            { name: 'Splash', amplitude: 0.05, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1200, q: 1.2,
-              lfo: { rate: 0.3, depth: 400 }, limiter: { base: 0.35 } }
-        ], 0.75);
+            { name: 'Bass', amplitude: 0.08, bufferDuration: 37, filterType: 'lowpass', frequency: 250, q: 0.8,
+              limiter: { base: 0.5 } },
+            { name: 'Mid', amplitude: 0.06, bufferDuration: 43, filterType: 'bandpass', frequency: 800, q: 0.6,
+              lfo: { rate: 0.15, depth: 250 }, limiter: { base: 0.35 } },
+            { name: 'Splash', amplitude: 0.04, bufferDuration: 47, filterType: 'highpass', frequency: 2500, q: 0.5,
+              lfo: { rate: 0.3, depth: 500 }, limiter: { base: 0.3 } }
+        ], 0.7);
     }
 
     startRiverSound() {
         const durs = this.getCicadaDurations(3);
         this.startLayeredSound('river', [
-            { name: 'Deep Bass', amplitude: 0.04, bufferDuration: durs[0], filterType: 'lowpass', frequency: 200, q: 0.6,
-              lfo: { rate: 0.1, depth: 0.6 }, burstLfo: { rate: 0.05, depth: 0.175, baseGain: 0.25 } },
+            { name: 'Deep Bass', amplitude: 0.05, bufferDuration: durs[0], filterType: 'lowpass', frequency: 200, q: 0.6,
+              lfo: { rate: 0.1, depth: 60 }, burstLfo: { rate: 0.05, depth: 0.08, baseGain: 0.35 } },
             { name: 'Mid Current', amplitude: 0.03, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1500, q: 2.5,
               lfo: { rate: 0.18, depth: 0.8 }, burstLfo: { rate: 0.08, depth: 0.175, baseGain: 0.25 } },
             { name: 'Surface', amplitude: 0.02, bufferDuration: durs[2], filterType: 'highpass', frequency: 2500, q: 0.3,
@@ -748,11 +756,11 @@ export class AudioManager {
         const durs = this.getCicadaDurations(3);
         this.startLayeredSound('tree', [
             { name: 'Rustle', amplitude: 0.04, bufferDuration: durs[0], filterType: 'bandpass', frequency: 1500, q: 0.8,
-              lfo: { rate: 0.1, depth: 300 }, limiter: { base: 0.35 } },
+              lfo: { rate: 0.1, depth: 300 }, limiter: { base: 0.35 }, pan: -0.3 },
             { name: 'Crackle', amplitude: 0.035, bufferDuration: durs[1], filterType: 'highpass', frequency: 2800, q: 0.5,
-              lfo: { rate: 0.15, depth: 500 }, limiter: { base: 0.3 } },
-            { name: 'Body', amplitude: 0.02, bufferDuration: durs[2], filterType: 'lowpass', frequency: 600, q: 0.5,
-              lfo: { rate: 0.06, depth: 80 }, limiter: { base: 0.2 } }
+              lfo: { rate: 0.15, depth: 500 }, limiter: { base: 0.3 }, pan: 0.3 },
+            { name: 'Body', amplitude: 0.03, bufferDuration: durs[2], filterType: 'lowpass', frequency: 600, q: 0.5,
+              lfo: { rate: 0.06, depth: 80 }, limiter: { base: 0.35 } }
         ], 0.5);
     }
 
@@ -760,13 +768,13 @@ export class AudioManager {
         const durs = this.getCicadaDurations(5);
         this.startLayeredSound('ocean', [
             { name: 'Swell', amplitude: 0.12, bufferDuration: durs[0], filterType: 'lowpass', frequency: 100, q: 0.6,
-              envelope: { base: 0.5, lfo: { rate: 0.05, depth: 0.25 } }, layerGain: 0.6 },
+              envelope: { base: 0.5, lfo: { rate: 0.07, depth: 0.25 } }, layerGain: 0.6 },
             { name: 'Wave', amplitude: 0.08, bufferDuration: durs[1], filterType: 'lowpass', frequency: 500, q: 0.5,
               envelope: { base: 0.4, lfo: { rate: 0.08, depth: 0.3 } }, layerGain: 0.5 },
             { name: 'Crest', amplitude: 0.04, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1000, q: 0.6,
               envelope: { base: 0.25, lfo: { rate: 0.1, depth: 0.2 } }, layerGain: 0.4 },
-            { name: 'Spray', amplitude: 0.04, bufferDuration: durs[3], filterType: 'highpass', frequency: 2500, q: 0.3,
-              envelope: { base: 0.3, lfo: { rate: 0.12, depth: 0.2 } }, layerGain: 0.35 },
+            { name: 'Spray', amplitude: 0.025, bufferDuration: durs[3], filterType: 'highpass', frequency: 2500, q: 0.3,
+              envelope: { base: 0.25, lfo: { rate: 0.12, depth: 0.2 } }, layerGain: 0.25 },
             { name: 'Surf', amplitude: 0.025, bufferDuration: durs[4], filterType: 'highpass', frequency: 5000, q: 0.3,
               envelope: { base: 0.2, lfo: { rate: 0.07, depth: 0.15 } }, layerGain: 0.3 }
         ], 0.7);
@@ -1079,6 +1087,9 @@ export class AudioManager {
             sirenConfig.gain.wet,
             sirenConfig.gain.dry
         );
+
+        // Store feedback gain for mute control
+        this._sirenFeedback = feedback;
 
         gains.push(feedback, wetGain, dryGain);
         allGains.push(feedback, wetGain, dryGain);
