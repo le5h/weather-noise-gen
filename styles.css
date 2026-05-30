@@ -376,9 +376,9 @@ body {
 
 .action-row {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    width: 100%;
+    gap: 0.4rem;
     flex-shrink: 0;
 }
 
@@ -479,7 +479,6 @@ body {
     padding: var(--pad-2xl);
     color: rgba(255, 255, 255, 0.9);
     flex-shrink: 0;
-    align-self: flex-end;
 }
 
 .vol-icon {
@@ -534,40 +533,45 @@ body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.4rem;
+    justify-content: center;
+    gap: 0.3rem;
     padding: var(--pad-md);
     color: rgba(255, 255, 255, 0.9);
     flex-shrink: 0;
-    font-size: 0.8rem;
-    align-self: flex-end;
 }
 
 .layer-toggle {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    background: rgba(255, 255, 255, 0.08);
-    border: 0.05rem solid rgba(255, 255, 255, 0.15);
-    border-radius: var(--radius-full);
-    padding: 0.15rem 0.5rem 0.15rem 0.3rem;
+    background: rgba(255, 255, 255, 0.15);
+    border: 0.05rem solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-2xl);
+    padding: var(--pad-sm);
     cursor: pointer;
     transition: all var(--transition-fast);
     user-select: none;
     white-space: nowrap;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
+    font-size: 0.8rem;
+    box-shadow: 0 0.2rem 0.8rem rgba(0, 0, 0, 0.2);
 }
 
 .layer-toggle:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    transform: translateY(-0.1rem);
 }
 
 .layer-toggle.muted {
-    opacity: 0.5;
-    background: rgba(255, 255, 255, 0.03);
+    opacity: 0.45;
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .layer-toggle-indicator {
-    width: 0.7rem;
-    height: 0.7rem;
+    width: 0.6rem;
+    height: 0.6rem;
     border-radius: 50%;
     background: #4ade80;
     flex-shrink: 0;
@@ -575,7 +579,7 @@ body {
 }
 
 .layer-toggle.muted .layer-toggle-indicator {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.25);
 }
 
 .layer-toggle-label {
@@ -808,19 +812,16 @@ body {
         padding: var(--pad-md);
         width: 100%;
         justify-content: center;
-        align-self: auto;
     }
 
     .layers-row {
         padding: var(--pad-xs);
         width: 100%;
-        justify-content: center;
-        align-self: auto;
         gap: 0.25rem;
     }
 
     .layer-toggle {
-        padding: 0.1rem 0.4rem 0.1rem 0.25rem;
+        padding: var(--pad-xs);
     }
 
     .layer-toggle-indicator {
