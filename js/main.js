@@ -22,6 +22,7 @@ class WeatherApp {
         this.volumeSlider = document.getElementById('volumeSlider');
         this.volValue = document.getElementById('volValue');
         this.layersRow = document.getElementById('layersRow');
+        this.vibrationBtn = document.getElementById('vibrationBtn');
         
         this.currentWeather = 'snow';
         this.renderer = new WeatherRenderer(this.canvas);
@@ -46,7 +47,10 @@ class WeatherApp {
     init() {
         this.setupCanvas();
         this.setupEventListeners();
-        
+
+        // Set initial vibration icon
+        this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇' : '🔕';
+
         // Show beautiful start screen immediately
         this.showStartScreen();
     }
@@ -96,7 +100,8 @@ class WeatherApp {
             this.layersRow.style.display = 'none';
             this.layersRow.innerHTML = '';
             this.settingsBtn.classList.remove('active');
-            this.settingsOpen = false;
+        this.settingsOpen = false;
+        this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
             // Call showStartScreen to ensure floating button appears
             this.showStartScreen();
         }, 50);
@@ -104,6 +109,7 @@ class WeatherApp {
     
     startExperience() {
         this.isStarted = true;
+        this.vibrate(15);
         
         // Hide floating start button when experience starts
         this.startBtn.style.display = 'none';
@@ -170,11 +176,19 @@ class WeatherApp {
             this.settingsBtn.classList.toggle('active', this.settingsOpen);
         });
 
+        // Vibration toggle
+        this.vibrationBtn.addEventListener('click', () => {
+            this.vibrationEnabled = !this.vibrationEnabled;
+            this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇' : '🔕';
+            localStorage.setItem('vibration', this.vibrationEnabled ? 'on' : 'off');
+        });
+
         // Volume slider
         this.volumeSlider.addEventListener('input', () => {
             const vol = parseFloat(this.volumeSlider.value);
             this.volValue.textContent = Math.round(vol * 100) + '%';
             this.audioManager.setVolume(vol);
+            this.vibrate(5);
         });
 
         // Weather button clicks
@@ -219,6 +233,11 @@ class WeatherApp {
             document.exitFullscreen();
         }
     }
+
+    vibrate(pattern) {
+        if (!this.vibrationEnabled) return;
+        if (navigator.vibrate) navigator.vibrate(pattern);
+    }
     
     setWeather(weather) {
         if (!this.weatherConfig[weather]) {
@@ -239,13 +258,16 @@ class WeatherApp {
         
         // Update audio
         this.audioManager.setWeather(weather);
-        
+
+        this.vibrate(15);
+
         // Connect thunder sound to lightning for thunder weather
         if (weather === 'thunder') {
             this.renderer.onThunder = () => {
                 if (this.audioManager.generateThunder) {
                     this.audioManager.generateThunder();
                 }
+                this.vibrate([100, 50, 80, 50, 60]);
             };
         } else {
             this.renderer.onThunder = null;
@@ -279,6 +301,7 @@ class WeatherApp {
                 const isMuted = toggle.classList.contains('muted');
                 this.audioManager.muteLayer(layer.group, layer.name, !isMuted);
                 toggle.classList.toggle('muted', !isMuted);
+                this.vibrate(10);
             });
 
             this.layersRow.appendChild(toggle);
