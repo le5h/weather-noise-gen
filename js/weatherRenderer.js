@@ -563,11 +563,10 @@ export class WeatherRenderer {
         }
     }
     
-    draw(ctx) {
-        // Draw lightning for thunder weather
+    draw(ctx, deltaTime = 0) {
         if (this.currentWeather === 'thunder') {
             this.drawLightning(ctx);
-            this.updateLightning();
+            this.updateLightning(deltaTime);
         }
         
         // Apply silhouette effect during lightning
@@ -729,17 +728,14 @@ export class WeatherRenderer {
         ctx.restore();
     }
     
-    updateLightning() {
+    updateLightning(deltaTime = 0) {
         if (!this.lightning.active) {
-            // Much rarer lightning (0.3% chance per frame)
-            if (Math.random() < 0.003) {
+            if (Math.random() < 0.18 * deltaTime) {
                 this.createLightning();
             }
             return;
         }
-        
-        // Slower fade out for longer visibility
-        this.lightning.opacity -= 0.02;
+        this.lightning.opacity -= 1.2 * deltaTime;
         if (this.lightning.opacity <= 0) {
             this.lightning.active = false;
         }

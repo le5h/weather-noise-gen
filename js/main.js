@@ -32,10 +32,11 @@ class WeatherApp {
         } catch (e) {}
         if (!this._vibrationSupported) {
             this.vibrationRow.style.display = 'none';
-            this.vibrationEnabled = false;
+            this._vibrationMode = 'off';
         } else {
-            this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
-            this.vibrationBtn.classList.toggle('muted', !this.vibrationEnabled);
+            const saved = localStorage.getItem('vibrationMode');
+            this._vibrationMode = (saved === 'off' || saved === 'legacy' || saved === 'modern') ? saved : 'modern';
+            this._updateVibrationUI();
         }
         
         this.currentWeather = 'snow';
@@ -67,7 +68,7 @@ class WeatherApp {
         this.setupEventListeners();
 
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) this._lastFrameTime = 0;
+            if (!document.hidden) this._lastFrameTime = 0;
         });
 
         this.showStartScreen();
@@ -120,8 +121,6 @@ class WeatherApp {
             this.layersRow.innerHTML = '';
             this.settingsBtn.classList.remove('active');
             this.settingsOpen = false;
-            this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
-            // Call showStartScreen to ensure floating button appears
             this.showStartScreen();
         }, 50);
     }
@@ -199,13 +198,13 @@ class WeatherApp {
             this.settingsBtn.classList.toggle('active', this.settingsOpen);
         });
 
-        // Vibration toggle
         this.vibrationBtn.addEventListener('click', () => {
-            this.vibrationEnabled = !this.vibrationEnabled;
-            this.vibrationBtn.classList.toggle('muted', !this.vibrationEnabled);
-            localStorage.setItem('vibration', this.vibrationEnabled ? 'on' : 'off');
-            // Test vibration when turning on
-            if (this.vibrationEnabled) this.vibrate(50);
+            const modes = ['off', 'modern', 'legacy'];
+            const idx = modes.indexOf(this._vibrationMode);
+            this._vibrationMode = modes[(idx + 1) % modes.length];
+            localStorage.setItem('vibrationMode', this._vibrationMode);
+            this._updateVibrationUI();
+            if (this._vibrationMode !== 'off') this.vibrate(50);
         });
 
         // Volume slider
@@ -259,10 +258,36 @@ class WeatherApp {
         }
     }
 
+    _updateVibrationUI() {
+        const label = this.vibrationBtn.querySelector('.vib-label');
+        const indicator = this.vibrationBtn.querySelector('.layer-toggle-indicator');
+        if (this._vibrationMode === 'legacy') {
+            this.vibrationBtn.classList.remove('muted');
+            label.textContent = 'Strong';
+            indicator.style.background = '#fbbf24';
+        } else if (this._vibrationMode === 'modern') {
+            this.vibrationBtn.classList.remove('muted');
+            label.textContent = 'Vibration';
+            indicator.style.background = '';
+        } else {
+            this.vibrationBtn.classList.add('muted');
+            label.textContent = 'Vibration';
+            indicator.style.background = '';
+        }
+    }
+
     vibrate(duration) {
-        if (!this.vibrationEnabled || !this._vibrationSupported) return;
+        if (this._vibrationMode === 'off' || !this._vibrationSupported) return;
         try {
-            navigator.vibrate(duration);
+            if (this._vibrationMode === 'legacy') {
+                if (Array.isArray(duration)) {
+                    navigator.vibrate(duration.map(v => Math.round(v * 3)));
+                } else {
+                    navigator.vibrate(Math.max(Math.round(duration * 10), 200));
+                }
+            } else {
+                navigator.vibrate(duration);
+            }
         } catch (e) {}
     }
     
@@ -350,12 +375,16 @@ class WeatherApp {
         const animate = (currentTime) => {
             this.animationId = requestAnimationFrame(animate);
 
-            if (document.hidden) return;
-
             let dt = this._lastFrameTime ? (currentTime - this._lastFrameTime) / 1000 : 0;
-            if (dt > 0.1) dt = 1 / 60;
+            if (dt > 0.1 && !document.hidden) dt = 1 / 60;
             const deltaTime = dt;
             this._lastFrameTime = currentTime;
+
+            if (document.hidden) {
+                this.renderer.update(deltaTime);
+                this.renderer.draw(this.ctx, deltaTime);
+                return;
+            }
 
             frameCount++;
             fpsTimer += deltaTime;
@@ -396,7 +425,7 @@ class WeatherApp {
 
             this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             this.renderer.update(deltaTime);
-            this.renderer.draw(this.ctx);
+            this.renderer.draw(this.ctx, deltaTime);
         };
 
         this.animationId = requestAnimationFrame(animate);
