@@ -15,12 +15,18 @@ class WeatherApp {
         this.startScreen = document.getElementById('startScreen');
         this.startBtn = document.getElementById('startBtn');
         this.backBtn = document.getElementById('backBtn');
-        this.weatherControls = document.querySelector('.weather-controls');
+        this.bottomArea = document.querySelector('.bottom-area');
+        this.weatherRow = document.querySelector('.weather-row');
+        this.volumeRow = document.getElementById('volumeRow');
+        this.settingsBtn = document.getElementById('settingsBtn');
+        this.volumeSlider = document.getElementById('volumeSlider');
+        this.volValue = document.getElementById('volValue');
         
         this.currentWeather = 'snow';
         this.renderer = new WeatherRenderer(this.canvas);
         this.audioManager = new AudioManager();
         this.isStarted = false;
+        this.settingsOpen = false;
         this.animationId = null;
         
         this.weatherConfig = {
@@ -46,7 +52,7 @@ class WeatherApp {
     
     showStartScreen() {
         this.startScreen.style.display = 'flex';
-        this.weatherControls.style.display = 'none';
+        this.bottomArea.style.display = 'none';
         // Show floating start button when back to start screen
         this.startBtn.style.display = 'block';
     }
@@ -84,7 +90,10 @@ class WeatherApp {
         
         setTimeout(() => {
             this.startScreen.style.opacity = '1';
-            this.weatherControls.style.display = 'none';
+            this.bottomArea.style.display = 'none';
+            this.volumeRow.style.display = 'none';
+            this.settingsBtn.classList.remove('active');
+            this.settingsOpen = false;
             // Call showStartScreen to ensure floating button appears
             this.showStartScreen();
         }, 50);
@@ -110,10 +119,13 @@ class WeatherApp {
         
         setTimeout(() => {
             this.startScreen.style.display = 'none';
-            this.weatherControls.style.display = 'flex';
+            this.bottomArea.style.display = 'flex';
             
             // Initialize audio and start weather
             this.audioManager.init();
+            
+            // Set initial volume from slider
+            this.audioManager.setVolume(parseFloat(this.volumeSlider.value));
             
             // Set random weather and ensure UI is properly updated
             this.setWeather(this.currentWeather);
@@ -147,6 +159,20 @@ class WeatherApp {
             this.backToStart();
         });
         
+        // Settings toggle
+        this.settingsBtn.addEventListener('click', () => {
+            this.settingsOpen = !this.settingsOpen;
+            this.volumeRow.style.display = this.settingsOpen ? 'flex' : 'none';
+            this.settingsBtn.classList.toggle('active', this.settingsOpen);
+        });
+
+        // Volume slider
+        this.volumeSlider.addEventListener('input', () => {
+            const vol = parseFloat(this.volumeSlider.value);
+            this.volValue.textContent = Math.round(vol * 100) + '%';
+            this.audioManager.setVolume(vol);
+        });
+
         // Weather button clicks
         this.weatherButtons.forEach(button => {
             button.addEventListener('click', () => {

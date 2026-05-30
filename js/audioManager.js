@@ -10,9 +10,16 @@ export class AudioManager {
         this.initialized = false;
         this.thunderWorker = null;
         this.pendingThunder = null;
+        this.masterGain = null;
 
         // Unified node tracking: name -> { sources: [], gains: [], lfos: [], filters: [], oscillators: [] }
         this.activeNodes = new Map();
+
+        // Prime durations for cicada noise (coprime lengths for long combined loop)
+        this.PRIME_DURATIONS = [17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61];
+
+        // Scheduled drift timeouts
+        this.driftTimeouts = [];
     }
 
     // ============ UTILITY FUNCTIONS ============
@@ -262,6 +269,13 @@ export class AudioManager {
             this.stopAndClear(name);
         }
         this.activeNodes.clear();
+
+        // Clear drift modulation timeouts
+        for (const tid of this.driftTimeouts) {
+            clearTimeout(tid);
+        }
+        this.driftTimeouts = [];
+        this._globalDriftStarted = false;
     }
     
     init() {
@@ -275,6 +289,10 @@ export class AudioManager {
                 this.audioContext.resume();
             }
             
+            // Create master gain node (all audio routes through this)
+            this.masterGain = this.createGain(0.8);
+            this.masterGain.connect(this.audioContext.destination);
+            
             // Initialize thunder worker
             this.initThunderWorker();
             
@@ -283,6 +301,21 @@ export class AudioManager {
         } catch (error) {
             console.warn('Web Audio API not supported:', error);
         }
+    }
+
+    setVolume(value) {
+        if (this.masterGain) {
+            const now = this.audioContext.currentTime;
+            this.masterGain.gain.cancelScheduledValues(now);
+            this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+            this.masterGain.gain.linearRampToValueAtTime(value, now + 0.1);
+        }
+    }
+
+    startGlobalDrift() {
+        if (!this.masterGain || this._globalDriftStarted) return;
+        this._globalDriftStarted = true;
+        this.startDriftModulation('_globalDrift', this.masterGain, [0.03, 0.08], [0.02, 0.06], [15, 40]);
     }
     
     initThunderWorker() {
@@ -316,6 +349,7 @@ export class AudioManager {
         console.log('Setting weather audio to:', weather);
         this.stopAllSounds();
         this.currentWeather = weather;
+        this.startGlobalDrift();
         
         switch (weather) {
             case 'sunny':
@@ -374,11 +408,59 @@ export class AudioManager {
             filter.connect(gain);
         }
 
-        gain.connect(this.audioContext.destination);
+        gain.connect(this.masterGain);
         source.start();
 
         this.registerNodes(name, nodes);
         console.log(`${name} sound started successfully`);
+    }
+
+    // ============ CICADA NOISE & DRIFT MODULATION ============
+
+    getPrimeDuration(index) {
+        return this.PRIME_DURATIONS[index % this.PRIME_DURATIONS.length];
+    }
+
+    getCicadaDurations(count) {
+        const start = Math.floor(Math.random() * (this.PRIME_DURATIONS.length - count));
+        return this.PRIME_DURATIONS.slice(start, start + count);
+    }
+
+    startDriftModulation(name, gainNode, rateRange, depthRange, intervalRange) {
+        if (!this.audioContext || !gainNode) return;
+
+        const rate = rateRange[0] + Math.random() * (rateRange[1] - rateRange[0]);
+        const depth = depthRange[0] + Math.random() * (depthRange[1] - depthRange[0]);
+
+        const lfo = this.createLFO(rate);
+        const lfoGain = this.createGain(depth);
+        lfo.connect(lfoGain);
+        lfoGain.connect(gainNode.gain);
+        lfo.start();
+
+        this.registerNodes(name, { lfos: [lfo, lfoGain] });
+        this.registerParamConnection(name, lfoGain, gainNode.gain);
+
+        const scheduleDrift = () => {
+            const newRate = rateRange[0] + Math.random() * (rateRange[1] - rateRange[0]);
+            const newDepth = depthRange[0] + Math.random() * (depthRange[1] - depthRange[0]);
+            const nextInterval = intervalRange[0] + Math.random() * (intervalRange[1] - intervalRange[0]);
+
+            const now = this.audioContext.currentTime;
+            lfo.frequency.cancelScheduledValues(now);
+            lfo.frequency.setValueAtTime(lfo.frequency.value, now);
+            lfo.frequency.linearRampToValueAtTime(newRate, now + 2);
+
+            lfoGain.gain.cancelScheduledValues(now);
+            lfoGain.gain.setValueAtTime(lfoGain.gain.value, now);
+            lfoGain.gain.linearRampToValueAtTime(newDepth, now + 2);
+
+            const tid = setTimeout(scheduleDrift, nextInterval * 1000);
+            this.driftTimeouts.push(tid);
+        };
+
+        const initTid = setTimeout(scheduleDrift, (intervalRange[0] + Math.random() * (intervalRange[1] - intervalRange[0])) * 1000);
+        this.driftTimeouts.push(initTid);
     }
 
     // ============ LAYERED SOUND SYSTEM ============
@@ -446,91 +528,90 @@ export class AudioManager {
             source.start();
         }
 
-        masterGain.connect(this.audioContext.destination);
+        masterGain.connect(this.masterGain);
         this.registerNodes(name, allNodes);
     }
 
     // ============ WEATHER SOUND METHODS ============
 
     startWindSound() {
-        this.startSimpleNoiseSound('wind', {
-            amplitude: 0.1,
-            duration: 2,
-            filterType: 'lowpass',
-            frequency: 400,
-            q: 1,
-            gain: 0.3,
-            lfo: { rate: 0.2, depth: 50, target: 'filter' }
-        });
+        const durs = this.getCicadaDurations(3);
+        this.startLayeredSound('wind', [
+            { amplitude: 0.07, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
+              lfo: { rate: 0.15, depth: 60 }, burstLfo: { rate: 0.08, depth: 0.25, baseGain: 0.35 } },
+            { amplitude: 0.06, bufferDuration: durs[1], filterType: 'lowpass', frequency: 500, q: 0.6,
+              lfo: { rate: 0.2, depth: 80 }, burstLfo: { rate: 0.12, depth: 0.2, baseGain: 0.3 } },
+            { amplitude: 0.04, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1200, q: 2.0,
+              lfo: { rate: 0.25, depth: 100 }, burstLfo: { rate: 0.06, depth: 0.3, baseGain: 0.25 } }
+        ], 0.2);
     }
 
     startRainSound() {
-        this.startSimpleNoiseSound('rain', {
-            amplitude: 0.06,
-            duration: 2,
-            filterType: 'bandpass',
-            frequency: 1500,
-            q: 0.8,
-            gain: 0.15
-        });
+        const durs = this.getCicadaDurations(3);
+        this.startLayeredSound('rain', [
+            { amplitude: 0.04, bufferDuration: durs[0], filterType: 'bandpass', frequency: 1200, q: 0.6,
+              lfo: { rate: 0.3, depth: 400 }, burstLfo: { rate: 0.15, depth: 0.3, baseGain: 0.2 } },
+            { amplitude: 0.035, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1800, q: 0.5,
+              lfo: { rate: 0.4, depth: 600 }, burstLfo: { rate: 0.2, depth: 0.25, baseGain: 0.18 } },
+            { amplitude: 0.025, bufferDuration: durs[2], filterType: 'highpass', frequency: 3000, q: 0.4,
+              lfo: { rate: 0.5, depth: 800 }, burstLfo: { rate: 0.25, depth: 0.35, baseGain: 0.15 } }
+        ], 0.2);
     }
 
     startWindHowlSound() {
-        this.startSimpleNoiseSound('windHowl', {
-            amplitude: 0.08,
-            duration: 6,
-            filterType: 'lowpass',
-            frequency: 800,
-            q: 2,
-            gain: 0.2,
-            lfo: { rate: 0.3, depth: 300, target: 'filter' },
-            secondFilter: { type: 'bandpass', frequency: 400, q: 5 }
-        });
+        const durs = this.getCicadaDurations(2);
+        this.startLayeredSound('windHowl', [
+            { amplitude: 0.06, bufferDuration: durs[0], filterType: 'lowpass', frequency: 600, q: 1.5,
+              lfo: { rate: 0.2, depth: 200 }, burstLfo: { rate: 0.1, depth: 0.3, baseGain: 0.25 } },
+            { amplitude: 0.05, bufferDuration: durs[1], filterType: 'lowpass', frequency: 1000, q: 1.0,
+              lfo: { rate: 0.3, depth: 300 }, burstLfo: { rate: 0.15, depth: 0.25, baseGain: 0.2 } }
+        ], 0.2);
     }
 
     startThunderRainSound() {
-        this.startSimpleNoiseSound('thunderRain', {
-            amplitude: 0.05,
-            duration: 2,
-            filterType: 'lowpass',
-            frequency: 6000,
-            q: 0.8,
-            gain: 0.25,
-            secondFilter: { type: 'highpass', frequency: 200, q: 0.5 }
-        });
+        const durs = this.getCicadaDurations(2);
+        this.startLayeredSound('thunderRain', [
+            { amplitude: 0.04, bufferDuration: durs[0], filterType: 'lowpass', frequency: 4000, q: 0.6,
+              lfo: { rate: 0.3, depth: 2000 }, burstLfo: { rate: 0.12, depth: 0.3, baseGain: 0.25 } },
+            { amplitude: 0.035, bufferDuration: durs[1], filterType: 'highpass', frequency: 200, q: 0.5,
+              lfo: { rate: 0.2, depth: 100 }, burstLfo: { rate: 0.18, depth: 0.25, baseGain: 0.2 } }
+        ], 0.2);
     }
 
     startRiverSound() {
+        const durs = this.getCicadaDurations(3);
         this.startLayeredSound('river', [
-            { amplitude: 0.04, bufferDuration: 4, filterType: 'lowpass', frequency: 200, q: 0.6,
+            { amplitude: 0.03, bufferDuration: durs[0], filterType: 'lowpass', frequency: 200, q: 0.6,
               lfo: { rate: 0.1, depth: 0.6 }, burstLfo: { rate: 0.05, depth: 0.175, baseGain: 0.25 } },
-            { amplitude: 0.03, bufferDuration: 4, filterType: 'bandpass', frequency: 1500, q: 2.5,
+            { amplitude: 0.025, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1500, q: 2.5,
               lfo: { rate: 0.18, depth: 0.8 }, burstLfo: { rate: 0.08, depth: 0.175, baseGain: 0.25 } },
-            { amplitude: 0.02, bufferDuration: 4, filterType: 'highpass', frequency: 2500, q: 0.3,
-              lfo: { rate: 0.26, depth: 1.0 }, burstLfo: { rate: 0.11, depth: 0.175, baseGain: 0.25 } }
+            { amplitude: 0.015, bufferDuration: durs[2], filterType: 'highpass', frequency: 2500, q: 0.3,
+              lfo: { rate: 0.26, depth: 1.0 }, burstLfo: { rate: 0.11, depth: 0.175, baseGain: 0.2 } }
         ], 0.2);
     }
 
     startTreeNoiseSound() {
+        const durs = this.getCicadaDurations(3);
         this.startLayeredSound('tree', [
-            { amplitude: 0.03, bufferDuration: 3, filterType: 'lowpass', frequency: 300, q: 0.8,
-              burstLfo: { rate: 0.2, depth: 0.3, baseGain: 0.4 } },
-            { amplitude: 0.025, bufferDuration: 3, filterType: 'bandpass', frequency: 1200, q: 2.0,
-              burstLfo: { rate: 0.3, depth: 0.3, baseGain: 0.4 } },
-            { amplitude: 0.02, bufferDuration: 3, filterType: 'highpass', frequency: 2000, q: 1.2,
-              burstLfo: { rate: 0.4, depth: 0.3, baseGain: 0.4 } }
+            { amplitude: 0.025, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
+              burstLfo: { rate: 0.15, depth: 0.3, baseGain: 0.35 } },
+            { amplitude: 0.02, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1200, q: 2.0,
+              burstLfo: { rate: 0.25, depth: 0.3, baseGain: 0.3 } },
+            { amplitude: 0.015, bufferDuration: durs[2], filterType: 'highpass', frequency: 2000, q: 1.2,
+              burstLfo: { rate: 0.35, depth: 0.3, baseGain: 0.25 } }
         ], 0.15);
     }
 
     startOceanSound() {
+        const durs = this.getCicadaDurations(3);
         this.startLayeredSound('ocean', [
-            { amplitude: 0.06, bufferDuration: 5, filterType: 'lowpass', frequency: 300, q: 0.8,
-              envelope: { base: 0.3, lfo: { rate: 0.1 + Math.random() * 0.15, depth: 0.4 } }, layerGain: 0.5 },
-            { amplitude: 0.04, bufferDuration: 5, filterType: 'bandpass', frequency: 800, q: 1.5,
-              envelope: { base: 0.3, lfo: { rate: 0.1 + Math.random() * 0.15, depth: 0.4 } }, layerGain: 0.7 },
-            { amplitude: 0.03, bufferDuration: 5, filterType: 'highpass', frequency: 2000, q: 0.5,
-              envelope: { base: 0.3, lfo: { rate: 0.1 + Math.random() * 0.15, depth: 0.4 } }, layerGain: 0.4 }
-        ], 0.25);
+            { amplitude: 0.05, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
+              envelope: { base: 0.3, lfo: { rate: 0.08 + Math.random() * 0.08, depth: 0.4 } }, layerGain: 0.5 },
+            { amplitude: 0.035, bufferDuration: durs[1], filterType: 'bandpass', frequency: 800, q: 1.5,
+              envelope: { base: 0.3, lfo: { rate: 0.08 + Math.random() * 0.08, depth: 0.4 } }, layerGain: 0.6 },
+            { amplitude: 0.02, bufferDuration: durs[2], filterType: 'highpass', frequency: 2000, q: 0.5,
+              envelope: { base: 0.3, lfo: { rate: 0.08 + Math.random() * 0.08, depth: 0.4 } }, layerGain: 0.35 }
+        ], 0.2);
     }
 
     startThunderSound() {
@@ -652,7 +733,7 @@ export class AudioManager {
         convolver.connect(wetGain);
         dryGain.connect(panNode);
         wetGain.connect(panNode);
-        panNode.connect(this.audioContext.destination);
+        panNode.connect(this.masterGain);
         
         thunderSource.start();
         thunderSource.stop(this.audioContext.currentTime + duration);
@@ -671,7 +752,7 @@ export class AudioManager {
             { frequency: 493.88, name: 'B4' }, { frequency: 587.33, name: 'D5' }
         ];
 
-        const masterGain = this.createGain(0.20);
+        const sunGain = this.createGain(0.20);
         const filter = this.createFilter('lowpass', 150, 0.8);
         const lfo = this.createLFO(0.08, 'sine');
         const lfoDepth = 0.03;
@@ -687,7 +768,7 @@ export class AudioManager {
 
         // Add ADSR envelope gains per note
         const noteGains = oscillators.map(() => this.createGain(0));
-        const allGains = [...gains, masterGain, ...lfos, ...noteGains];
+        const allGains = [...gains, sunGain, ...lfos, ...noteGains];
 
         // Re-chain: osc → noteGain → oscGain → filter → master
         oscillators.forEach((osc, i) => {
@@ -699,8 +780,8 @@ export class AudioManager {
             oscGain.connect(filter);
         });
 
-        filter.connect(masterGain);
-        masterGain.connect(this.audioContext.destination);
+        filter.connect(sunGain);
+        sunGain.connect(this.masterGain);
         lfo.start();
 
         this.registerNodes('sun', { oscillators, gains: allGains, filters: [filter], lfos: [lfo] });
@@ -777,7 +858,7 @@ export class AudioManager {
             }
         };
 
-        const masterGain = this.createGain(0);
+        const sirenMaster = this.createGain(0);
         // Use -cos(t) LFO that starts at -1 (bottom), rises through center to +1
         const lfo = this.createInvertedCosineLFO(sirenConfig.frequency.sweepRate);
         const lfoDepth = (sirenConfig.frequency.max - sirenConfig.frequency.min) / 2;
@@ -791,13 +872,13 @@ export class AudioManager {
             type: 'sawtooth'
         }));
 
-        const { oscillators, gains, panners, lfos } = this.createOscillatorBank(sirenOscConfigs, { lfo, lfoDepth, masterGain });
+        const { oscillators, gains, panners, lfos } = this.createOscillatorBank(sirenOscConfigs, { lfo, lfoDepth, masterGain: sirenMaster });
 
-        const allGains = [...gains, masterGain, ...lfos];
+        const allGains = [...gains, sirenMaster, ...lfos];
 
         // Restore volume after LFO phase sync (original slow fade-in)
         const restoreTime = this.audioContext.currentTime + (3 / (sirenConfig.frequency.sweepRate * 4));
-        masterGain.gain.linearRampToValueAtTime(sirenConfig.gain.main, restoreTime + 0.1);
+        sirenMaster.gain.linearRampToValueAtTime(sirenConfig.gain.main, restoreTime + 0.1);
 
         // Create delay/echo effect using helper
         const { delayNode, feedback, dryGain, wetGain } = this.createDelayEffect(
@@ -810,8 +891,8 @@ export class AudioManager {
         gains.push(feedback, wetGain, dryGain);
         allGains.push(feedback, wetGain, dryGain);
 
-        masterGain.connect(dryGain);
-        masterGain.connect(delayNode);
+        sirenMaster.connect(dryGain);
+        sirenMaster.connect(delayNode);
         delayNode.connect(wetGain);
 
         // Add filters
@@ -824,7 +905,7 @@ export class AudioManager {
 
         dryGain.connect(sirenFilter);
         sirenFilter.connect(highPassFilter);
-        highPassFilter.connect(this.audioContext.destination);
+        highPassFilter.connect(this.masterGain);
 
         wetGain.connect(echoFilter);
         echoFilter.connect(highPassFilter);
