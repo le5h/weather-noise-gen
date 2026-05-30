@@ -24,8 +24,8 @@ class WeatherApp {
         this.layersRow = document.getElementById('layersRow');
         this.vibrationRow = document.getElementById('vibrationRow');
         this.vibrationBtn = this.vibrationRow.querySelector('.vib-toggle');
-        this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
-        this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇 Vibration' : '🔕 Vibration';
+        this.vibrationEnabled = navigator.vibrate ? localStorage.getItem('vibration') !== 'off' : false;
+        this.vibrationBtn.classList.toggle('muted', !this.vibrationEnabled);
         
         this.currentWeather = 'snow';
         this.renderer = new WeatherRenderer(this.canvas);
@@ -181,7 +181,7 @@ class WeatherApp {
         // Vibration toggle
         this.vibrationBtn.addEventListener('click', () => {
             this.vibrationEnabled = !this.vibrationEnabled;
-            this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇 Vibration' : '🔕 Vibration';
+            this.vibrationBtn.classList.toggle('muted', !this.vibrationEnabled);
             localStorage.setItem('vibration', this.vibrationEnabled ? 'on' : 'off');
         });
 
