@@ -187,17 +187,18 @@ class WeatherApp {
             });
         });
 
-        // Fullscreen toggle on canvas double-click
-        this.canvas.addEventListener('dblclick', () => {
-            if (!this.isStarted) return;
+        // Fullscreen toggle on canvas double-click / double-tap
+        this.canvas.addEventListener('dblclick', () => this.toggleFullscreen());
 
-            if (!document.fullscreenElement) {
-                this.weatherApp.requestFullscreen();
-                this.bottomArea.style.opacity = '0';
-                this.bottomArea.style.transition = 'opacity 0.3s';
-            } else {
-                document.exitFullscreen();
+        let lastTap = 0;
+        this.canvas.addEventListener('touchend', (e) => {
+            if (!this.isStarted) return;
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                e.preventDefault();
+                this.toggleFullscreen();
             }
+            lastTap = now;
         });
 
         document.addEventListener('fullscreenchange', () => {
@@ -206,6 +207,17 @@ class WeatherApp {
                 this.bottomArea.style.transition = 'opacity 0.3s';
             }
         });
+    }
+
+    toggleFullscreen() {
+        if (!this.isStarted) return;
+        if (!document.fullscreenElement) {
+            this.weatherApp.requestFullscreen();
+            this.bottomArea.style.opacity = '0';
+            this.bottomArea.style.transition = 'opacity 0.3s';
+        } else {
+            document.exitFullscreen();
+        }
     }
     
     setWeather(weather) {
