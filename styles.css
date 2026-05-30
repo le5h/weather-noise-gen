@@ -528,6 +528,18 @@ body {
     font-variant-numeric: tabular-nums;
 }
 
+/* Vibration row */
+
+.vibration-row {
+    display: flex;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.vib-toggle {
+    font-size: 0.85rem;
+}
+
 /* Layers row */
 
 .layers-row {
@@ -859,10 +871,9 @@ body {
 
     .weather-row,
     .volume-row,
+    .vibration-row,
     .layers-row {
         padding: var(--pad-xs);
-        width: 100%;
-        gap: 0.4rem;
     }
 
     .weather-row {

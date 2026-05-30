@@ -22,7 +22,10 @@ class WeatherApp {
         this.volumeSlider = document.getElementById('volumeSlider');
         this.volValue = document.getElementById('volValue');
         this.layersRow = document.getElementById('layersRow');
-        this.vibrationBtn = document.getElementById('vibrationBtn');
+        this.vibrationRow = document.getElementById('vibrationRow');
+        this.vibrationBtn = this.vibrationRow.querySelector('.vib-toggle');
+        this.vibrationEnabled = localStorage.getItem('vibration') !== 'off';
+        this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇 Vibration' : '🔕 Vibration';
         
         this.currentWeather = 'snow';
         this.renderer = new WeatherRenderer(this.canvas);
@@ -47,9 +50,6 @@ class WeatherApp {
     init() {
         this.setupCanvas();
         this.setupEventListeners();
-
-        // Set initial vibration icon
-        this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇' : '🔕';
 
         // Show beautiful start screen immediately
         this.showStartScreen();
@@ -97,6 +97,7 @@ class WeatherApp {
             this.startScreen.style.opacity = '1';
             this.bottomArea.style.display = 'none';
             this.volumeRow.style.display = 'none';
+            this.vibrationRow.style.display = 'none';
             this.layersRow.style.display = 'none';
             this.layersRow.innerHTML = '';
             this.settingsBtn.classList.remove('active');
@@ -172,6 +173,7 @@ class WeatherApp {
         this.settingsBtn.addEventListener('click', () => {
             this.settingsOpen = !this.settingsOpen;
             this.volumeRow.style.display = this.settingsOpen ? 'flex' : 'none';
+            this.vibrationRow.style.display = this.settingsOpen ? 'flex' : 'none';
             this.layersRow.style.display = this.settingsOpen ? 'flex' : 'none';
             this.settingsBtn.classList.toggle('active', this.settingsOpen);
         });
@@ -179,7 +181,7 @@ class WeatherApp {
         // Vibration toggle
         this.vibrationBtn.addEventListener('click', () => {
             this.vibrationEnabled = !this.vibrationEnabled;
-            this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇' : '🔕';
+            this.vibrationBtn.textContent = this.vibrationEnabled ? '🔇 Vibration' : '🔕 Vibration';
             localStorage.setItem('vibration', this.vibrationEnabled ? 'on' : 'off');
         });
 
