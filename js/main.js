@@ -34,6 +34,10 @@ class WeatherApp {
         }
         
         this.currentWeather = 'snow';
+        this.dpr = 1;
+        this._dprState = 'init';        // 'init' | 'probing' | 'settled'
+        this._fpsSamples = [];
+        this._dprResult = null;         // { low: avg, high: avg }
         this.renderer = new WeatherRenderer(this.canvas);
         this.audioManager = new AudioManager();
         this.isStarted = false;
@@ -153,19 +157,18 @@ class WeatherApp {
         }, 500);
     }
     
+    _applyDpr() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        this.canvas.width = w * this.dpr;
+        this.canvas.height = h * this.dpr;
+        this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        this.renderer.resize(w, h);
+    }
+
     setupCanvas() {
-        const resize = () => {
-            this.dpr = Math.min(window.devicePixelRatio || 1, 2);
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            this.canvas.width = w * this.dpr;
-            this.canvas.height = h * this.dpr;
-            this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-            this.renderer.resize(w, h);
-        };
-        
-        resize();
-        window.addEventListener('resize', resize);
+        this._applyDpr();
+        window.addEventListener('resize', () => this._applyDpr());
     }
     
     setupEventListeners() {
@@ -342,17 +345,47 @@ class WeatherApp {
             const deltaTime = lastTime ? (currentTime - lastTime) / 1000 : 0;
             lastTime = currentTime;
 
-            // FPS monitoring — disable high DPI if too slow
+            // FPS monitoring — adaptive DPI probing
             frameCount++;
             fpsTimer += deltaTime;
             if (fpsTimer >= 1) {
                 const fps = frameCount / fpsTimer;
-                if (fps < 30 && this.dpr > 1) {
-                    this.dpr = 1;
-                    this.setupCanvas();
-                }
                 frameCount = 0;
                 fpsTimer = 0;
+
+                if (this._dprState !== 'settled') {
+                    this._fpsSamples.push(fps);
+                    if (this._fpsSamples.length >= 5) {
+                        const avg = this._fpsSamples.reduce((a, b) => a + b, 0) / this._fpsSamples.length;
+                        this._fpsSamples = [];
+
+                        if (this._dprState === 'init') {
+                            // First 5s at 1x — try high DPI only if smooth
+                            this._dprResult = { low: avg, high: null };
+                            if (avg >= 55) {
+                                this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+                                this._applyDpr();
+                                this._dprState = 'probing';
+                            } else {
+                                this._dprState = 'settled';
+                            }
+                        } else {
+                            // Second 5s at 2x — keep high only if >= 50 FPS
+                            this._dprResult.high = avg;
+                            if (avg < 50) {
+                                this.dpr = 1;
+                                this._applyDpr();
+                            }
+                            this._dprState = 'settled';
+                        }
+                    }
+                }
+
+                // Emergency fallback if settled but still struggling
+                if (this._dprState === 'settled' && fps < 25 && this.dpr > 1) {
+                    this.dpr = 1;
+                    this._applyDpr();
+                }
             }
 
             this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
