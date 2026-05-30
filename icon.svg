@@ -14,7 +14,9 @@
     </linearGradient>
     <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#1e4a6b"/>
-      <stop offset="100%" stop-color="#0f2a3d"/>
+      <stop offset="25%" stop-color="#1a3d5c"/>
+      <stop offset="55%" stop-color="#122b44"/>
+      <stop offset="100%" stop-color="#081829"/>
     </linearGradient>
     <linearGradient id="waveform" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#c8e6b0"/>
@@ -23,8 +25,19 @@
     </linearGradient>
     <linearGradient id="reflection" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#87ceeb" stop-opacity="0.25"/>
+      <stop offset="45%" stop-color="#6ba3c7" stop-opacity="0.1"/>
       <stop offset="100%" stop-color="#1e4a6b" stop-opacity="0"/>
     </linearGradient>
+    <linearGradient id="seabed" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a1a2a" stop-opacity="0"/>
+      <stop offset="40%" stop-color="#06101c" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#020810" stop-opacity="0.7"/>
+    </linearGradient>
+    <radialGradient id="baseGlow" cx="50%" cy="0%" r="60%" fx="50%" fy="0%">
+      <stop offset="0%" stop-color="#87ceeb" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#6ba3c7" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#1e4a6b" stop-opacity="0"/>
+    </radialGradient>
     <filter id="glowFilter" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="6" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
@@ -39,6 +52,9 @@
 
   <!-- Water -->
   <rect x="0" y="300" width="512" height="212" fill="url(#water)"/>
+
+  <!-- Waveform base glow -->
+  <rect x="0" y="300" width="512" height="120" fill="url(#baseGlow)"/>
 
   <!-- Horizon line -->
   <line x1="0" y1="300" x2="512" y2="300" stroke="rgba(168,137,168,0.6)" stroke-width="1.5"/>
@@ -68,6 +84,61 @@
     L512 480 L0 480 Z"
     fill="url(#reflection)"/>
 
+  <!-- Seabed silhouette -->
+  <path d="M0 460 Q40 440 80 450 Q130 435 180 445 Q240 430 300 448 Q360 438 420 450 Q470 440 512 455 L512 512 L0 512 Z" fill="url(#seabed)"/>
+
+  <!-- Water surface ripples -->
+  <g fill="none" stroke="rgba(168,200,220,0.12)" stroke-width="1.2" stroke-linecap="round">
+    <path d="M40 308 Q60 305 80 308 Q100 311 120 308 Q140 305 160 308 Q180 311 200 308 Q220 305 240 308 Q260 311 280 308 Q300 305 320 308 Q340 311 360 308 Q380 305 400 308 Q420 311 440 308 Q460 305 480 308"/>
+    <path d="M20 318 Q45 315 70 318 Q95 321 120 318 Q145 315 170 318 Q195 321 220 318 Q245 315 270 318 Q295 321 320 318 Q345 315 370 318 Q395 321 420 318 Q445 315 470 318 L490 318"/>
+    <path d="M60 332 Q80 329 100 332 Q120 335 140 332 Q160 329 180 332 Q200 335 220 332 Q240 329 260 332 Q280 335 300 332 Q320 329 340 332 Q360 335 380 332 Q400 329 420 332 Q440 335 460 332"/>
+  </g>
+
+  <!-- Deeper wave lines -->
+  <g fill="none" stroke="rgba(100,160,190,0.06)" stroke-width="1" stroke-linecap="round">
+    <path d="M80 360 Q110 357 140 360 Q170 363 200 360 Q230 357 260 360 Q290 363 320 360 Q350 357 380 360 Q410 363 440 360"/>
+    <path d="M50 390 Q85 387 120 390 Q155 393 190 390 Q225 387 260 390 Q295 393 330 390 Q365 387 400 390 Q435 393 470 390"/>
+  </g>
+
+  <!-- Lightning water reflections -->
+  <g stroke="rgba(255,255,255,0.08)" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M150 320 L158 360 L146 360 L160 400" stroke-width="1.5"/>
+    <path d="M374 320 L382 350 L370 350 L380 380" stroke-width="1.2"/>
+  </g>
+
+  <!-- Underwater light shafts -->
+  <g fill="none" stroke="rgba(135,206,235,0.04)" stroke-linecap="round">
+    <line x1="176" y1="300" x2="160" y2="440" stroke-width="8"/>
+    <line x1="296" y1="300" x2="285" y2="420" stroke-width="6"/>
+    <line x1="400" y1="300" x2="410" y2="440" stroke-width="7"/>
+  </g>
+
+  <!-- Foam / surface shimmer dots -->
+  <g fill="#fff" opacity="0.08">
+    <circle cx="60" cy="304" r="1.2"/>
+    <circle cx="140" cy="306" r="1"/>
+    <circle cx="220" cy="303" r="1.3"/>
+    <circle cx="300" cy="307" r="1"/>
+    <circle cx="380" cy="304" r="1.2"/>
+    <circle cx="450" cy="305" r="1"/>
+    <circle cx="100" cy="310" r="0.8"/>
+    <circle cx="260" cy="312" r="0.8"/>
+    <circle cx="420" cy="309" r="0.9"/>
+  </g>
+
+  <!-- Underwater drift particles -->
+  <g fill="rgba(135,206,235,0.06)">
+    <circle cx="90" cy="370" r="1.5"/>
+    <circle cx="200" cy="400" r="1.2"/>
+    <circle cx="330" cy="380" r="1.3"/>
+    <circle cx="430" cy="420" r="1"/>
+    <circle cx="150" cy="430" r="1.2"/>
+    <circle cx="280" cy="440" r="0.8"/>
+    <circle cx="380" cy="390" r="1.1"/>
+    <circle cx="50" cy="410" r="0.9"/>
+    <circle cx="480" cy="370" r="1"/>
+  </g>
+
   <!-- Lightning bolt -->
   <g filter="url(#glowFilter)">
     <path d="M160 60 L148 120 L170 120 L150 180" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
@@ -83,7 +154,7 @@
     <path d="M436 52 q-28 24 0 48"/>
   </g>
 
-  <!-- Particle clusters: stars (top) -->
+  <!-- Stars -->
   <g fill="#fff">
     <circle cx="72" cy="36" r="2.5" opacity=".35"/>
     <circle cx="95" cy="52" r="1.5" opacity=".25"/>
@@ -99,7 +170,7 @@
     <circle cx="395" cy="50" r="1.5" opacity=".18"/>
   </g>
 
-  <!-- Particle clusters: rain streaks (mid) -->
+  <!-- Rain streaks -->
   <g stroke="#fff" stroke-linecap="round" opacity=".12">
     <line x1="50" y1="110" x2="45" y2="128" stroke-width="1.2"/>
     <line x1="120" y1="95" x2="115" y2="113" stroke-width="1"/>
@@ -110,7 +181,7 @@
     <line x1="450" y1="100" x2="445" y2="118" stroke-width="1"/>
   </g>
 
-  <!-- Subtitle dots (floating in air) -->
+  <!-- Floating air particles -->
   <g fill="#fff" opacity=".08">
     <circle cx="100" cy="170" r="1.5"/>
     <circle cx="155" cy="145" r="1.2"/>
