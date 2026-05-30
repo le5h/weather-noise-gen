@@ -779,11 +779,13 @@ export class AudioManager {
         // Add a master gain for thunder strikes
         const thunderMaster = this.createGain(1);
         this._thunderMaster = thunderMaster;
-        thunderMaster.connect(this.masterGain);
+        const thunderMuteGain = this.createGain(1);
+        thunderMaster.connect(thunderMuteGain);
+        thunderMuteGain.connect(this.masterGain);
 
         // Store for mute control
         const thunderLayerMap = new Map();
-        thunderLayerMap.set('Thunder', thunderMaster);
+        thunderLayerMap.set('Thunder', thunderMuteGain);
         this._layerGains.set('thunder', thunderLayerMap);
         const thunderMuted = this._mutedLayers.get('thunder');
         if (thunderMuted) {
@@ -956,14 +958,16 @@ export class AudioManager {
         });
 
         filter.connect(sunGain);
-        sunGain.connect(this.masterGain);
+        const sunMuteGain = this.createGain(1);
+        sunGain.connect(sunMuteGain);
+        sunMuteGain.connect(this.masterGain);
         lfo.start();
 
-        this.registerNodes('sun', { oscillators, gains: allGains, filters: [filter], lfos: [lfo] });
+        this.registerNodes('sun', { oscillators, gains: [...allGains, sunMuteGain], filters: [filter], lfos: [lfo] });
 
-        // Store master gain for mute control
+        // Store mute gain for mute control
         const sunLayerMap = new Map();
-        sunLayerMap.set('Sun Hum', sunGain);
+        sunLayerMap.set('Sun Hum', sunMuteGain);
         this._layerGains.set('sun', sunLayerMap);
         // Restore muted state
         const sunMuted = this._mutedLayers.get('sun');
@@ -1093,18 +1097,20 @@ export class AudioManager {
 
         dryGain.connect(sirenFilter);
         sirenFilter.connect(highPassFilter);
-        highPassFilter.connect(this.masterGain);
+        const sirenMuteGain = this.createGain(1);
+        highPassFilter.connect(sirenMuteGain);
+        sirenMuteGain.connect(this.masterGain);
 
         wetGain.connect(echoFilter);
         echoFilter.connect(highPassFilter);
 
         lfo.start();
 
-        this.registerNodes('siren', { oscillators, gains: allGains, lfos: [lfo], filters, other: [delayNode, ...panners] });
+        this.registerNodes('siren', { oscillators, gains: [...allGains, sirenMuteGain], lfos: [lfo], filters, other: [delayNode, ...panners] });
 
-        // Store master gain for mute control
+        // Store mute gain for mute control
         const sirenLayerMap = new Map();
-        sirenLayerMap.set('Siren', sirenMaster);
+        sirenLayerMap.set('Siren', sirenMuteGain);
         this._layerGains.set('siren', sirenLayerMap);
         const sirenMuted = this._mutedLayers.get('siren');
         if (sirenMuted) {
