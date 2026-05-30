@@ -595,12 +595,12 @@ export class AudioManager {
     startTreeNoiseSound() {
         const durs = this.getCicadaDurations(3);
         this.startLayeredSound('tree', [
-            { amplitude: 0.025, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
-              burstLfo: { rate: 0.15, depth: 0.3, baseGain: 0.35 } },
-            { amplitude: 0.02, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1200, q: 2.0,
-              burstLfo: { rate: 0.25, depth: 0.3, baseGain: 0.3 } },
-            { amplitude: 0.015, bufferDuration: durs[2], filterType: 'highpass', frequency: 2000, q: 1.2,
-              burstLfo: { rate: 0.35, depth: 0.3, baseGain: 0.25 } }
+            { amplitude: 0.03, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
+              lfo: { rate: 0.08, depth: 60 }, limiter: { base: 0.35 } },
+            { amplitude: 0.025, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1200, q: 1.5,
+              lfo: { rate: 0.12, depth: 200 }, limiter: { base: 0.3 } },
+            { amplitude: 0.02, bufferDuration: durs[2], filterType: 'highpass', frequency: 2000, q: 0.8,
+              lfo: { rate: 0.15, depth: 300 }, limiter: { base: 0.2 } }
         ], 0.5);
     }
 
