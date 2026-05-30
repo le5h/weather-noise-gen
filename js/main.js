@@ -18,6 +18,7 @@ class WeatherApp {
         this.bottomArea = document.querySelector('.bottom-area');
         this.weatherRow = document.querySelector('.weather-row');
         this.volumeRow = document.getElementById('volumeRow');
+        this.settingsBtn = document.getElementById('settingsBtn');
         this.volumeSlider = document.getElementById('volumeSlider');
         this.volValue = document.getElementById('volValue');
         this.layersRow = document.getElementById('layersRow');
