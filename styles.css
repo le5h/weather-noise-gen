@@ -698,9 +698,11 @@ body {
     .weather-name { font-size: 0.85rem; }
     .use-name { font-size: 0.85rem; }
 
-    .weather-info,
-    .use-info {
-        max-width: 7rem;
+    .weather-desc,
+    .use-desc {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 
     .weather-desc { font-size: 0.75rem; }
