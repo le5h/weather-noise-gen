@@ -535,15 +535,13 @@ export class AudioManager {
     // ============ WEATHER SOUND METHODS ============
 
     startWindSound() {
-        const durs = this.getCicadaDurations(3);
+        const durs = this.getCicadaDurations(2);
         this.startLayeredSound('wind', [
-            { amplitude: 0.08, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
-              lfo: { rate: 0.03, depth: 15 }, limiter: { base: 0.35 } },
-            { amplitude: 0.07, bufferDuration: durs[1], filterType: 'lowpass', frequency: 500, q: 0.6,
-              lfo: { rate: 0.04, depth: 20 }, limiter: { base: 0.3 } },
-            { amplitude: 0.05, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1200, q: 2.0,
-              lfo: { rate: 0.05, depth: 30 }, limiter: { base: 0.2 } }
-        ], 0.7);
+            { amplitude: 0.1, bufferDuration: durs[0], filterType: 'lowpass', frequency: 400, q: 0.8,
+              lfo: { rate: 0.15, depth: 50 }, limiter: { base: 0.35 } },
+            { amplitude: 0.06, bufferDuration: durs[1], filterType: 'lowpass', frequency: 800, q: 0.6,
+              lfo: { rate: 0.2, depth: 80 }, limiter: { base: 0.25 } }
+        ], 0.65);
     }
 
     startRainSound() {
@@ -569,17 +567,15 @@ export class AudioManager {
     }
 
     startThunderRainSound() {
-        const durs = this.getCicadaDurations(4);
+        const durs = this.getCicadaDurations(3);
         this.startLayeredSound('thunderRain', [
-            { amplitude: 0.09, bufferDuration: durs[0], filterType: 'lowpass', frequency: 200, q: 0.7,
-              lfo: { rate: 0.1, depth: 80 }, limiter: { base: 0.5 } },
-            { amplitude: 0.07, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1200, q: 1.2,
-              lfo: { rate: 0.3, depth: 400 }, limiter: { base: 0.4 } },
-            { amplitude: 0.05, bufferDuration: durs[2], filterType: 'lowpass', frequency: 3000, q: 0.5,
-              lfo: { rate: 0.25, depth: 500 }, limiter: { base: 0.35 } },
-            { amplitude: 0.04, bufferDuration: durs[3], filterType: 'highpass', frequency: 3000, q: 0.4,
-              lfo: { rate: 0.35, depth: 600 }, limiter: { base: 0.25 } }
-        ], 0.8);
+            { amplitude: 0.07, bufferDuration: durs[0], filterType: 'lowpass', frequency: 5000, q: 0.5,
+              limiter: { base: 0.45 } },
+            { amplitude: 0.06, bufferDuration: durs[1], filterType: 'highpass', frequency: 200, q: 0.5,
+              limiter: { base: 0.4 } },
+            { amplitude: 0.05, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1200, q: 1.2,
+              lfo: { rate: 0.3, depth: 400 }, limiter: { base: 0.35 } }
+        ], 0.75);
     }
 
     startRiverSound() {
