@@ -24,7 +24,12 @@ class WeatherApp {
         this.layersRow = document.getElementById('layersRow');
         this.vibrationRow = document.getElementById('vibrationRow');
         this.vibrationBtn = this.vibrationRow.querySelector('.vib-toggle');
-        this._vibrationSupported = 'vibrate' in navigator;
+        this._vibrationSupported = false;
+        try {
+            this._vibrationSupported = 'vibrate' in navigator &&
+                typeof navigator.vibrate === 'function' &&
+                /Mobi|Android/i.test(navigator.userAgent);
+        } catch (e) {}
         if (!this._vibrationSupported) {
             this.vibrationRow.style.display = 'none';
             this.vibrationEnabled = false;
@@ -120,7 +125,7 @@ class WeatherApp {
     
     startExperience() {
         this.isStarted = true;
-        this.vibrate(15);
+        this.vibrate(30);
         
         // Hide floating start button when experience starts
         this.startBtn.style.display = 'none';
@@ -205,7 +210,7 @@ class WeatherApp {
             const vol = parseFloat(this.volumeSlider.value);
             this.volValue.textContent = Math.round(vol * 100) + '%';
             this.audioManager.setVolume(vol);
-            this.vibrate(10);
+            this.vibrate(30);
         });
 
         // Weather button clicks
@@ -251,13 +256,11 @@ class WeatherApp {
         }
     }
 
-    vibrate(pattern) {
-        if (!this.vibrationEnabled) return;
+    vibrate(duration) {
+        if (!this.vibrationEnabled || !this._vibrationSupported) return;
         try {
-            if (typeof navigator.vibrate === 'function') navigator.vibrate(pattern);
-        } catch (e) {
-            // Vibration API may throw on some browsers
-        }
+            navigator.vibrate(duration);
+        } catch (e) {}
     }
     
     setWeather(weather) {
@@ -322,7 +325,7 @@ class WeatherApp {
                 const isMuted = toggle.classList.contains('muted');
                 this.audioManager.muteLayer(layer.group, layer.name, !isMuted);
                 toggle.classList.toggle('muted', !isMuted);
-                this.vibrate(15);
+                this.vibrate(20);
             });
 
             this.layersRow.appendChild(toggle);
