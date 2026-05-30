@@ -538,11 +538,11 @@ export class AudioManager {
         const durs = this.getCicadaDurations(3);
         this.startLayeredSound('wind', [
             { amplitude: 0.08, bufferDuration: durs[0], filterType: 'lowpass', frequency: 300, q: 0.8,
-              lfo: { rate: 0.03, depth: 20 }, envelope: { base: 0.5, lfo: { rate: 0.05, depth: 0.08 } }, layerGain: 0.5 },
+              lfo: { rate: 0.03, depth: 15 }, limiter: { base: 0.35 } },
             { amplitude: 0.07, bufferDuration: durs[1], filterType: 'lowpass', frequency: 500, q: 0.6,
-              lfo: { rate: 0.04, depth: 30 }, envelope: { base: 0.5, lfo: { rate: 0.07, depth: 0.06 } }, layerGain: 0.5 },
+              lfo: { rate: 0.04, depth: 20 }, limiter: { base: 0.3 } },
             { amplitude: 0.05, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1200, q: 2.0,
-              lfo: { rate: 0.05, depth: 50 }, envelope: { base: 0.45, lfo: { rate: 0.04, depth: 0.1 } }, layerGain: 0.4 }
+              lfo: { rate: 0.05, depth: 30 }, limiter: { base: 0.2 } }
         ], 0.7);
     }
 
@@ -571,15 +571,15 @@ export class AudioManager {
     startThunderRainSound() {
         const durs = this.getCicadaDurations(4);
         this.startLayeredSound('thunderRain', [
-            { amplitude: 0.08, bufferDuration: durs[0], filterType: 'lowpass', frequency: 200, q: 0.7,
-              lfo: { rate: 0.1, depth: 80 }, limiter: { base: 0.35 } },
-            { amplitude: 0.06, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1200, q: 1.2,
-              lfo: { rate: 0.3, depth: 400 }, limiter: { base: 0.3 } },
-            { amplitude: 0.04, bufferDuration: durs[2], filterType: 'lowpass', frequency: 3000, q: 0.5,
-              lfo: { rate: 0.25, depth: 500 }, limiter: { base: 0.25 } },
-            { amplitude: 0.03, bufferDuration: durs[3], filterType: 'highpass', frequency: 3000, q: 0.4,
-              lfo: { rate: 0.35, depth: 600 }, limiter: { base: 0.2 } }
-        ], 0.65);
+            { amplitude: 0.09, bufferDuration: durs[0], filterType: 'lowpass', frequency: 200, q: 0.7,
+              lfo: { rate: 0.1, depth: 80 }, limiter: { base: 0.5 } },
+            { amplitude: 0.07, bufferDuration: durs[1], filterType: 'bandpass', frequency: 1200, q: 1.2,
+              lfo: { rate: 0.3, depth: 400 }, limiter: { base: 0.4 } },
+            { amplitude: 0.05, bufferDuration: durs[2], filterType: 'lowpass', frequency: 3000, q: 0.5,
+              lfo: { rate: 0.25, depth: 500 }, limiter: { base: 0.35 } },
+            { amplitude: 0.04, bufferDuration: durs[3], filterType: 'highpass', frequency: 3000, q: 0.4,
+              lfo: { rate: 0.35, depth: 600 }, limiter: { base: 0.25 } }
+        ], 0.8);
     }
 
     startRiverSound() {
@@ -607,16 +607,18 @@ export class AudioManager {
     }
 
     startOceanSound() {
-        const durs = this.getCicadaDurations(4);
+        const durs = this.getCicadaDurations(5);
         this.startLayeredSound('ocean', [
-            { amplitude: 0.1, bufferDuration: durs[0], filterType: 'lowpass', frequency: 80, q: 1.2,
-              envelope: { base: 0.5, lfo: { rate: 0.03, depth: 0.15 } }, layerGain: 0.6 },
-            { amplitude: 0.08, bufferDuration: durs[1], filterType: 'lowpass', frequency: 200, q: 0.8,
-              envelope: { base: 0.4, lfo: { rate: 0.05, depth: 0.2 } }, layerGain: 0.55 },
-            { amplitude: 0.025, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1000, q: 1.5,
-              envelope: { base: 0.2, lfo: { rate: 0.06, depth: 0.15 } }, layerGain: 0.35 },
-            { amplitude: 0.025, bufferDuration: durs[3], filterType: 'highpass', frequency: 2000, q: 0.5,
-              envelope: { base: 0.25, lfo: { rate: 0.08, depth: 0.15 } }, layerGain: 0.35 }
+            { amplitude: 0.12, bufferDuration: durs[0], filterType: 'lowpass', frequency: 100, q: 0.6,
+              envelope: { base: 0.5, lfo: { rate: 0.05, depth: 0.25 } }, layerGain: 0.6 },
+            { amplitude: 0.08, bufferDuration: durs[1], filterType: 'lowpass', frequency: 500, q: 0.5,
+              envelope: { base: 0.4, lfo: { rate: 0.08, depth: 0.3 } }, layerGain: 0.5 },
+            { amplitude: 0.04, bufferDuration: durs[2], filterType: 'bandpass', frequency: 1000, q: 0.6,
+              envelope: { base: 0.25, lfo: { rate: 0.1, depth: 0.2 } }, layerGain: 0.4 },
+            { amplitude: 0.04, bufferDuration: durs[3], filterType: 'highpass', frequency: 2500, q: 0.3,
+              envelope: { base: 0.3, lfo: { rate: 0.12, depth: 0.2 } }, layerGain: 0.35 },
+            { amplitude: 0.025, bufferDuration: durs[4], filterType: 'highpass', frequency: 5000, q: 0.3,
+              envelope: { base: 0.2, lfo: { rate: 0.07, depth: 0.15 } }, layerGain: 0.3 }
         ], 0.7);
     }
 
@@ -725,7 +727,7 @@ export class AudioManager {
         thunderFilter.frequency.exponentialRampToValueAtTime(80, this.audioContext.currentTime + duration);
         
         const thunderGain = this.audioContext.createGain();
-        thunderGain.gain.value = 0.6;
+        thunderGain.gain.value = 0.3;
         
         // Create wet/dry mix with wetter reverb
         const { dryGain, wetGain } = this.createWetDryMix(0.3, 0.7);
