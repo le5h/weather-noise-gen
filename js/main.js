@@ -263,7 +263,7 @@ class WeatherApp {
         const indicator = this.vibrationBtn.querySelector('.layer-toggle-indicator');
         if (this._vibrationMode === 'legacy') {
             this.vibrationBtn.classList.remove('muted');
-            label.textContent = 'Strong';
+            label.textContent = 'Vib. Strong';
             indicator.style.background = '#fbbf24';
         } else if (this._vibrationMode === 'modern') {
             this.vibrationBtn.classList.remove('muted');
@@ -281,9 +281,9 @@ class WeatherApp {
         try {
             if (this._vibrationMode === 'legacy') {
                 if (Array.isArray(duration)) {
-                    navigator.vibrate(duration.map(v => Math.round(v * 3)));
+                    navigator.vibrate(duration.map(v => Math.round(v * 5)));
                 } else {
-                    navigator.vibrate(Math.max(Math.round(duration * 10), 200));
+                    navigator.vibrate(Math.max(Math.round(duration * 20), 400));
                 }
             } else {
                 navigator.vibrate(duration);
