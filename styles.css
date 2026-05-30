@@ -548,7 +548,7 @@ body {
     background: rgba(255, 255, 255, 0.15);
     border: 0.05rem solid rgba(255, 255, 255, 0.2);
     border-radius: var(--radius-2xl);
-    padding: var(--pad-sm);
+    padding: 0.35rem 0.6rem;
     cursor: pointer;
     transition: all var(--transition-fast);
     user-select: none;
@@ -820,7 +820,7 @@ body {
     }
 
     .layer-toggle {
-        padding: var(--pad-xs);
+        padding: 0.25rem 0.45rem;
     }
 
     .layer-toggle-indicator {
