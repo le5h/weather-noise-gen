@@ -186,6 +186,26 @@ class WeatherApp {
                 this.setWeather(weather);
             });
         });
+
+        // Fullscreen toggle on canvas double-click
+        this.canvas.addEventListener('dblclick', () => {
+            if (!this.isStarted) return;
+
+            if (!document.fullscreenElement) {
+                this.weatherApp.requestFullscreen();
+                this.bottomArea.style.opacity = '0';
+                this.bottomArea.style.transition = 'opacity 0.3s';
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                this.bottomArea.style.opacity = '1';
+                this.bottomArea.style.transition = 'opacity 0.3s';
+            }
+        });
     }
     
     setWeather(weather) {
