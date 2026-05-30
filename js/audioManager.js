@@ -248,41 +248,6 @@ export class AudioManager {
         entry.paramConnections.push({ from: fromNode, to: toParam });
     }
 
-    stopAndClear(name) {
-        const nodes = this.activeNodes.get(name);
-        if (!nodes) return;
-
-        // First disconnect all parameter connections (LFOs from AudioParams)
-        if (nodes.paramConnections) {
-            for (const conn of nodes.paramConnections) {
-                try { conn.from.disconnect(conn.to); } catch (e) {}
-            }
-        }
-
-        for (const source of nodes.sources) this.safeStop(source);
-        for (const lfo of nodes.lfos) this.safeStop(lfo);
-        for (const osc of nodes.oscillators) this.safeStop(osc);
-        for (const gain of nodes.gains) this.safeStop(gain);
-        for (const filter of nodes.filters) this.safeStop(filter);
-        for (const other of nodes.other) this.safeStop(other);
-
-        this.activeNodes.delete(name);
-    }
-
-    stopAllSounds() {
-        for (const name of this.activeNodes.keys()) {
-            this.stopAndClear(name);
-        }
-        this.activeNodes.clear();
-
-        // Clear drift modulation timeouts
-        for (const tid of this.driftTimeouts) {
-            clearTimeout(tid);
-        }
-        this.driftTimeouts = [];
-        this._globalDriftStarted = false;
-    }
-    
     init() {
         if (this.initialized) return;
         
@@ -314,6 +279,16 @@ export class AudioManager {
             this.masterGain.gain.cancelScheduledValues(now);
             this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
             this.masterGain.gain.linearRampToValueAtTime(value, now + 0.1);
+        }
+
+        // Disconnect global drift LFO at zero volume so it can't add leakage
+        if (this._globalDriftLfoGain) {
+            if (value === 0) {
+                try { this._globalDriftLfoGain.disconnect(this.masterGain.gain); } catch (e) {}
+            } else if (!this._globalDriftLfoGain._connected) {
+                this._globalDriftLfoGain.connect(this.masterGain.gain);
+                this._globalDriftLfoGain._connected = true;
+            }
         }
     }
 
@@ -459,6 +434,12 @@ export class AudioManager {
         lfo.connect(lfoGain);
         lfoGain.connect(gainNode.gain);
         lfo.start();
+
+        // Save reference for volume-dependent disconnect
+        if (name === '_globalDrift') {
+            this._globalDriftLfoGain = lfoGain;
+            lfoGain._connected = true;
+        }
 
         this.registerNodes(name, { lfos: [lfo, lfoGain] });
         this.registerParamConnection(name, lfoGain, gainNode.gain);
@@ -691,6 +672,7 @@ export class AudioManager {
         }
         this.driftTimeouts = [];
         this._globalDriftStarted = false;
+        this._globalDriftLfoGain = null;
     }
 
     // ============ WEATHER SOUND METHODS ============
