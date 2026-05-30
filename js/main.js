@@ -18,9 +18,9 @@ class WeatherApp {
         this.bottomArea = document.querySelector('.bottom-area');
         this.weatherRow = document.querySelector('.weather-row');
         this.volumeRow = document.getElementById('volumeRow');
-        this.settingsBtn = document.getElementById('settingsBtn');
         this.volumeSlider = document.getElementById('volumeSlider');
         this.volValue = document.getElementById('volValue');
+        this.layersRow = document.getElementById('layersRow');
         
         this.currentWeather = 'snow';
         this.renderer = new WeatherRenderer(this.canvas);
@@ -92,6 +92,8 @@ class WeatherApp {
             this.startScreen.style.opacity = '1';
             this.bottomArea.style.display = 'none';
             this.volumeRow.style.display = 'none';
+            this.layersRow.style.display = 'none';
+            this.layersRow.innerHTML = '';
             this.settingsBtn.classList.remove('active');
             this.settingsOpen = false;
             // Call showStartScreen to ensure floating button appears
@@ -163,6 +165,7 @@ class WeatherApp {
         this.settingsBtn.addEventListener('click', () => {
             this.settingsOpen = !this.settingsOpen;
             this.volumeRow.style.display = this.settingsOpen ? 'flex' : 'none';
+            this.layersRow.style.display = this.settingsOpen ? 'flex' : 'none';
             this.settingsBtn.classList.toggle('active', this.settingsOpen);
         });
 
@@ -213,6 +216,39 @@ class WeatherApp {
             };
         } else {
             this.renderer.onThunder = null;
+        }
+
+        // Update layer toggles for the new weather
+        this.updateLayersPanel();
+    }
+
+    updateLayersPanel() {
+        const layers = this.audioManager.getLayersForWeather(this.currentWeather);
+        this.layersRow.innerHTML = '';
+
+        for (const layer of layers) {
+            const toggle = document.createElement('button');
+            toggle.className = 'layer-toggle' + (layer.muted ? ' muted' : '');
+            toggle.dataset.group = layer.group;
+            toggle.dataset.name = layer.name;
+
+            const indicator = document.createElement('span');
+            indicator.className = 'layer-toggle-indicator';
+
+            const label = document.createElement('span');
+            label.className = 'layer-toggle-label';
+            label.textContent = layer.name;
+
+            toggle.appendChild(indicator);
+            toggle.appendChild(label);
+
+            toggle.addEventListener('click', () => {
+                const isMuted = toggle.classList.contains('muted');
+                this.audioManager.muteLayer(layer.group, layer.name, !isMuted);
+                toggle.classList.toggle('muted', !isMuted);
+            });
+
+            this.layersRow.appendChild(toggle);
         }
     }
     
