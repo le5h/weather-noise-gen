@@ -149,9 +149,13 @@ class WeatherApp {
     
     setupCanvas() {
         const resize = () => {
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
-            this.renderer.resize(this.canvas.width, this.canvas.height);
+            this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            this.canvas.width = w * this.dpr;
+            this.canvas.height = h * this.dpr;
+            this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+            this.renderer.resize(w, h);
         };
         
         resize();
@@ -319,18 +323,32 @@ class WeatherApp {
     
     startAnimation() {
         let lastTime = 0;
-        
+        let frameCount = 0;
+        let fpsTimer = 0;
+
         const animate = (currentTime) => {
-            // Calculate delta time in seconds
             const deltaTime = lastTime ? (currentTime - lastTime) / 1000 : 0;
             lastTime = currentTime;
-            
-            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // FPS monitoring — disable high DPI if too slow
+            frameCount++;
+            fpsTimer += deltaTime;
+            if (fpsTimer >= 1) {
+                const fps = frameCount / fpsTimer;
+                if (fps < 30 && this.dpr > 1) {
+                    this.dpr = 1;
+                    this.setupCanvas();
+                }
+                frameCount = 0;
+                fpsTimer = 0;
+            }
+
+            this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             this.renderer.update(deltaTime);
             this.renderer.draw(this.ctx);
             this.animationId = requestAnimationFrame(animate);
         };
-        
+
         this.animationId = requestAnimationFrame(animate);
     }
 }
