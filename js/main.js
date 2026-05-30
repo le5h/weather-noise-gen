@@ -193,6 +193,8 @@ class WeatherApp {
             this.vibrationEnabled = !this.vibrationEnabled;
             this.vibrationBtn.classList.toggle('muted', !this.vibrationEnabled);
             localStorage.setItem('vibration', this.vibrationEnabled ? 'on' : 'off');
+            // Test vibration when turning on
+            if (this.vibrationEnabled) this.vibrate(50);
         });
 
         // Volume slider
@@ -200,7 +202,7 @@ class WeatherApp {
             const vol = parseFloat(this.volumeSlider.value);
             this.volValue.textContent = Math.round(vol * 100) + '%';
             this.audioManager.setVolume(vol);
-            this.vibrate(5);
+            this.vibrate(10);
         });
 
         // Weather button clicks
@@ -248,7 +250,11 @@ class WeatherApp {
 
     vibrate(pattern) {
         if (!this.vibrationEnabled) return;
-        if (typeof navigator.vibrate === 'function') navigator.vibrate(pattern);
+        try {
+            if (typeof navigator.vibrate === 'function') navigator.vibrate(pattern);
+        } catch (e) {
+            // Vibration API may throw on some browsers
+        }
     }
     
     setWeather(weather) {
@@ -271,7 +277,7 @@ class WeatherApp {
         // Update audio
         this.audioManager.setWeather(weather);
 
-        this.vibrate(15);
+        this.vibrate(20);
 
         // Connect thunder sound to lightning for thunder weather
         if (weather === 'thunder') {
@@ -313,7 +319,7 @@ class WeatherApp {
                 const isMuted = toggle.classList.contains('muted');
                 this.audioManager.muteLayer(layer.group, layer.name, !isMuted);
                 toggle.classList.toggle('muted', !isMuted);
-                this.vibrate(10);
+                this.vibrate(15);
             });
 
             this.layersRow.appendChild(toggle);
