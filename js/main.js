@@ -66,7 +66,10 @@ class WeatherApp {
         this.setupCanvas();
         this.setupEventListeners();
 
-        // Show beautiful start screen immediately
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) this._lastFrameTime = 0;
+        });
+
         this.showStartScreen();
     }
     
@@ -340,15 +343,20 @@ class WeatherApp {
     }
     
     startAnimation() {
-        let lastTime = 0;
+        this._lastFrameTime = 0;
         let frameCount = 0;
         let fpsTimer = 0;
 
         const animate = (currentTime) => {
-            const deltaTime = lastTime ? (currentTime - lastTime) / 1000 : 0;
-            lastTime = currentTime;
+            this.animationId = requestAnimationFrame(animate);
 
-            // FPS monitoring — adaptive DPI probing
+            if (document.hidden) return;
+
+            let dt = this._lastFrameTime ? (currentTime - this._lastFrameTime) / 1000 : 0;
+            if (dt > 0.1) dt = 1 / 60;
+            const deltaTime = dt;
+            this._lastFrameTime = currentTime;
+
             frameCount++;
             fpsTimer += deltaTime;
             if (fpsTimer >= 1) {
@@ -363,8 +371,6 @@ class WeatherApp {
                         this._fpsSamples = [];
 
                         if (this._dprState === 'init') {
-                            // First 5s at 1x — try high DPI only if smooth
-                            this._dprResult = { low: avg, high: null };
                             if (avg >= 55) {
                                 this.dpr = Math.min(window.devicePixelRatio || 1, 2);
                                 this._applyDpr();
@@ -373,8 +379,6 @@ class WeatherApp {
                                 this._dprState = 'settled';
                             }
                         } else {
-                            // Second 5s at 2x — keep high only if >= 50 FPS
-                            this._dprResult.high = avg;
                             if (avg < 50) {
                                 this.dpr = 1;
                                 this._applyDpr();
@@ -384,7 +388,6 @@ class WeatherApp {
                     }
                 }
 
-                // Emergency fallback if settled but still struggling
                 if (this._dprState === 'settled' && fps < 25 && this.dpr > 1) {
                     this.dpr = 1;
                     this._applyDpr();
@@ -394,7 +397,6 @@ class WeatherApp {
             this.ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
             this.renderer.update(deltaTime);
             this.renderer.draw(this.ctx);
-            this.animationId = requestAnimationFrame(animate);
         };
 
         this.animationId = requestAnimationFrame(animate);
