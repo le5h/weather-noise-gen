@@ -535,13 +535,15 @@ export class AudioManager {
     // ============ WEATHER SOUND METHODS ============
 
     startWindSound() {
-        const durs = this.getCicadaDurations(2);
-        this.startLayeredSound('wind', [
-            { amplitude: 0.1, bufferDuration: durs[0], filterType: 'lowpass', frequency: 400, q: 0.8,
-              lfo: { rate: 0.15, depth: 50 }, limiter: { base: 0.35 } },
-            { amplitude: 0.06, bufferDuration: durs[1], filterType: 'lowpass', frequency: 800, q: 0.6,
-              lfo: { rate: 0.2, depth: 80 }, limiter: { base: 0.25 } }
-        ], 0.65);
+        this.startSimpleNoiseSound('wind', {
+            amplitude: 0.1,
+            duration: 8,
+            filterType: 'lowpass',
+            frequency: 400,
+            q: 1,
+            gain: 0.38,
+            lfo: { rate: 0.2, depth: 50, target: 'filter' }
+        });
     }
 
     startRainSound() {
