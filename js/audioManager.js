@@ -267,6 +267,8 @@ export class AudioManager {
             this.initThunderWorker();
             
             this.initialized = true;
+            // Reset currentWeather so first setWeather() call always proceeds
+            this.currentWeather = null;
             console.log('Audio initialized successfully');
         } catch (error) {
             console.warn('Web Audio API not supported:', error);
